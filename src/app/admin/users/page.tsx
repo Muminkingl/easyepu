@@ -107,14 +107,12 @@ export default function ManageUsersPage() {
         
         return {
           'Display Name': displayName,
-          'Username': user.username ? `@${user.username}` : 'Not Set',
           'Email': user.email,
           'Role': user.role || 'student',
           'Phone Number': user.phone_number || 'Not provided',
           'Gender': user.gender || 'Not specified',
           'Group Class': user.group_class || 'Not assigned',
-          'Account Created': new Date(user.created_at).toLocaleString(),
-          'Last Updated': new Date(user.updated_at).toLocaleString()
+          'Account Created': user.created_at ? new Date(user.created_at).toLocaleString() : 'Unknown'
         };
       });
       
@@ -135,7 +133,9 @@ export default function ManageUsersPage() {
   // Function to fetch Clerk user data
   async function fetchClerkData() {
     try {
+      setIsManualLoading(true);
       const response = await fetch('/api/admin/get-users-clerk-data');
+      
       if (response.ok) {
         const data = await response.json();
         const userMap: Record<string, ClerkUserData> = {};
@@ -149,19 +149,30 @@ export default function ManageUsersPage() {
         }
         
         setClerkUsers(userMap);
-        
-        // If users are loaded, retry fetching for any missing names after a delay
-        if (users.length > 0) {
-          const missingNames = users.filter(user => !userMap[user.clerk_id]?.fullName);
-          if (missingNames.length > 0) {
-            setTimeout(() => {
-              fetchClerkData();
-            }, 2000); // Retry after 2 seconds
-          }
+        setIsManualLoading(false);
+      } else {
+        // Check if this is an auth error (don't log it to console to prevent noise)
+        if (response.status === 401 || response.status === 403) {
+          // Silently handle auth errors
+          setIsManualLoading(false);
+          return; // Don't retry on auth errors
         }
+        
+        // For non-auth errors, log and possibly retry
+        console.error('Failed to fetch Clerk data:', await response.text());
+        setIsManualLoading(false);
+        
+        // Retry for other types of errors
+        setTimeout(() => {
+          fetchClerkData();
+        }, 5000); // Retry after 5 seconds
       }
     } catch (error) {
-      console.error('Error fetching Clerk data:', error);
+      // Only log non-auth errors
+      if (error instanceof Error && !error.message.includes('Unauthorized')) {
+        console.error('Error fetching Clerk data:', error);
+      }
+      setIsManualLoading(false);
     }
   }
 
@@ -558,9 +569,6 @@ export default function ManageUsersPage() {
                           Name
                         </th>
                         <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-indigo-300 uppercase tracking-wider">
-                          Username
-                        </th>
-                        <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-indigo-300 uppercase tracking-wider">
                           Email Address
                         </th>
                         <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-indigo-300 uppercase tracking-wider">
@@ -611,17 +619,6 @@ export default function ManageUsersPage() {
                                 </div>
                               </div>
                             </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            {user.username ? (
-                              <div className="text-sm font-medium text-indigo-100">
-                                @{user.username}
-                              </div>
-                            ) : (
-                              <span className="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-amber-100/10 text-amber-100">
-                                Not Set
-                              </span>
-                            )}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm text-indigo-100">

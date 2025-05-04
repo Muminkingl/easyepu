@@ -842,14 +842,14 @@ export default function AdminPollResults({ pollId }: AdminPollResultsProps) {
                                 user.gender === 'female' ? 'bg-gradient-to-br from-pink-500 to-pink-600' : 
                                 'bg-gradient-to-br from-indigo-500 to-indigo-600'
                               }`}>
-                                {user.username ? user.username.charAt(0).toUpperCase() : <User className="h-5 w-5" />}
+                                {user.email ? user.email.charAt(0).toUpperCase() : <User className="h-5 w-5" />}
                               </div>
                               <div className="ml-4">
                                 <div className="text-sm font-medium text-indigo-100 truncate max-w-[200px]">
-                                  {user.username || 'Anonymous User'}
+                                  {user.email || (user.user_id.startsWith('anonymous') ? 'Anonymous User' : 'Unknown User')}
                                 </div>
                                 <div className="text-xs text-indigo-400 truncate max-w-[200px]">
-                                  {user.email || (user.user_id.startsWith('anonymous') ? 'Anonymous voter' : 'No email')}
+                                  {user.user_id}
                                 </div>
                               </div>
                             </div>
@@ -943,12 +943,11 @@ export default function AdminPollResults({ pollId }: AdminPollResultsProps) {
                       // Download user data as CSV
                       if (!results.user_data || results.user_data.length === 0) return;
                       
-                      const headers = ['User ID', 'Username', 'Email', 'Gender', 'Group', 'Vote'];
+                      const headers = ['User ID', 'Email', 'Gender', 'Group', 'Vote'];
                       const csvContent = [
                         headers.join(','),
                         ...results.user_data.map(user => [
                           user.user_id,
-                          user.username || 'Anonymous',
                           user.email || 'N/A',
                           user.gender || 'Unknown',
                           user.group_class || 'Not assigned',

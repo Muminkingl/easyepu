@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useUser } from '@clerk/nextjs';
 import { Poll, PollResults, getPollResults, getUserPollResponse, getUserProfile } from '@/lib/supabase';
 import { submitPollResponseAction, getPollByIdAction } from '@/lib/actions';
-import { ChartBarIcon, ClockIcon, CheckCircleIcon, LockIcon, AlertTriangleIcon, UserIcon } from 'lucide-react';
+import { ChartBarIcon, ClockIcon, CheckCircleIcon, LockIcon, AlertTriangleIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useTranslations } from '@/lib/i18n';
 
@@ -28,9 +28,7 @@ export default function PollComponent({ poll: initialPoll, compact = false }: Po
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [userGender, setUserGender] = useState<string | null>(null);
   const [userGroupClass, setUserGroupClass] = useState<string | null>(null);
-  const [username, setUsername] = useState<string | null>(null);
   const [hasProfileError, setHasProfileError] = useState(false);
-  const [missingUsername, setMissingUsername] = useState(false);
 
   // Load poll results and check if user has voted
   useEffect(() => {
@@ -57,19 +55,13 @@ export default function PollComponent({ poll: initialPoll, compact = false }: Po
         if (userProfile) {
           setUserGender(userProfile.gender || null);
           setUserGroupClass(userProfile.group_class || null);
-          setUsername(userProfile.username || null);
           
-          // Check if username, gender and group_class are set
-          const missingUsername = !userProfile.username;
+          // Check if gender and group_class are set
           const missingProfileInfo = !userProfile.gender || !userProfile.group_class;
-          
-          setMissingUsername(missingUsername);
-          setHasProfileError(missingProfileInfo || missingUsername);
+          setHasProfileError(missingProfileInfo);
         } else {
           setUserGender(null);
           setUserGroupClass(null);
-          setUsername(null);
-          setMissingUsername(true);
           setHasProfileError(true);
         }
       } catch (err) {
@@ -113,6 +105,8 @@ export default function PollComponent({ poll: initialPoll, compact = false }: Po
         }
 
         // Check for changes in the user's vote
+        if (!user) return; // Early return if no user
+
         const userResponse = await getUserPollResponse(poll.id, user.id);
         if (userResponse !== null && !isEditing) {
           setSelectedOption(userResponse);
@@ -141,14 +135,6 @@ export default function PollComponent({ poll: initialPoll, compact = false }: Po
 
   const handleVote = async () => {
     if (!user || selectedOption === null || !poll.is_active) return;
-
-    // Check if user has set their username
-    if (!username) {
-      setMissingUsername(true);
-      setHasProfileError(true);
-      setError(t('poll.usernameRequired') || 'You must set a username in your profile before voting');
-      return;
-    }
 
     // Check if user has set their gender and group class
     if (!userGender || !userGroupClass) {
@@ -198,14 +184,6 @@ export default function PollComponent({ poll: initialPoll, compact = false }: Po
 
   const confirmVoteChange = async () => {
     if (!user || tempSelectedOption === null) return;
-    
-    // Check if user has set their username
-    if (!username) {
-      setMissingUsername(true);
-      setHasProfileError(true);
-      setError(t('poll.usernameRequired') || 'You must set a username in your profile before voting');
-      return;
-    }
     
     // Check if user has set their gender and group class
     if (!userGender || !userGroupClass) {
@@ -270,19 +248,14 @@ export default function PollComponent({ poll: initialPoll, compact = false }: Po
               </div>
               <div className="ml-4">
                 <h3 className="text-xl font-semibold text-amber-100 mb-2">
-                  {missingUsername 
-                    ? (t('poll.usernameRequired') || 'Username required') 
-                    : t('poll.completeProfileRequired')}
+                  {t('poll.completeProfileRequired')}
                 </h3>
                 <p className="text-amber-200 mb-4">
-                  {missingUsername 
-                    ? (t('poll.usernameRequiredMessage') || 'Please set your username in your profile before participating in polls.') 
-                    : t('poll.completeProfileMessage')}
+                  {t('poll.completeProfileMessage')}
                 </p>
                 <Link href="/dashboard/profile" 
                   className="inline-flex items-center px-4 py-2 border border-amber-500 bg-amber-500/20 hover:bg-amber-500/30 text-amber-100 rounded-lg transition-colors duration-200"
                 >
-                  {missingUsername ? <UserIcon className="mr-2 h-4 w-4" /> : null}
                   {t('poll.updateProfile')}
                 </Link>
               </div>
