@@ -6,9 +6,10 @@ import { useTranslations } from '@/lib/i18n';
 import { BarChart, Check, Edit2, Bell, Calendar, ChevronLeft, Loader2, AlertTriangle, RefreshCw } from 'lucide-react';
 import { getAnnouncements, getPollByAnnouncementId } from '@/lib/supabase';
 import Link from 'next/link';
-import { submitPollResponseAction, getPollResultsAction } from '@/lib/actions';
+import { submitPollResponseAction, getPollResultsAction, getUserDataAction } from '@/lib/actions';
 import { useUser } from '@clerk/nextjs';
 import DOMPurify from 'dompurify';
+import { useRouter } from 'next/navigation';
 
 interface PollOption {
   id: string;
@@ -318,6 +319,34 @@ function PollComponent({ poll }: { poll: Poll }) {
   const userId = user?.id || 'anonymous'; // Use the actual Clerk user ID
   
   const isRtl = dir === 'rtl';
+  const router = useRouter();
+  
+  // Add state variables for user profile data
+  const [userGender, setUserGender] = useState<string | null>(null);
+  const [userGroupClass, setUserGroupClass] = useState<string | null>(null);
+  const [hasProfileError, setHasProfileError] = useState(false);
+  const [profileLoading, setProfileLoading] = useState(true);
+  
+  // Add effect to fetch user profile data
+  useEffect(() => {
+    if (!user || !user.id) return;
+    
+    const fetchUserProfile = async () => {
+      try {
+        const userData = await getUserDataAction(user.id);
+        if (userData) {
+          setUserGender(userData.gender || null);
+          setUserGroupClass(userData.group_class || null);
+        }
+      } catch (error) {
+        console.error('Error fetching user profile:', error);
+      } finally {
+        setProfileLoading(false);
+      }
+    };
+    
+    fetchUserProfile();
+  }, [user]);
   
   // Add defensive checks for poll data
   if (!poll) {
@@ -472,8 +501,16 @@ function PollComponent({ poll }: { poll: Poll }) {
   const handleVote = async () => {
     if (!selectedOption || !userId || !poll) return;
     
+    // Check if user profile is complete before voting
+    if (!userGender || !userGroupClass) {
+      setHasProfileError(true);
+      setError(t('poll.completeProfileRequired') || 'Please complete your profile before voting');
+      return;
+    }
+    
     setSubmitting(true);
     setError('');
+    setHasProfileError(false);
     
     try {
       // Find the option index from the selectedOption ID
@@ -582,6 +619,25 @@ function PollComponent({ poll }: { poll: Poll }) {
       <h3 className={`text-xl font-semibold text-white mb-4 ${isRtl ? 'text-right' : ''}`}>
         {poll.question || (t('poll.noQuestionAvailable') || "No question available")}
       </h3>
+
+      {/* Show profile error message if needed */}
+      {hasProfileError && (
+        <div className="mb-6 bg-amber-900/30 text-amber-300 p-4 rounded-lg border border-amber-800/30 flex flex-col">
+          <div className="flex items-center mb-2">
+            <AlertTriangle className="h-5 w-5 mr-2" />
+            <span className="font-medium">{t('poll.completeProfileRequired') || 'Complete your profile to vote'}</span>
+          </div>
+          <p className="mb-3 text-sm">
+            {t('poll.profileRequiredMessage') || 'You must set your gender and class/group before you can vote in polls.'}
+          </p>
+          <Link 
+            href="/dashboard/profile" 
+            className="self-start px-4 py-2 bg-amber-800/50 hover:bg-amber-700/50 text-amber-100 rounded-lg transition-colors text-sm"
+          >
+            {t('poll.updateProfile') || 'Update Profile'}
+          </Link>
+        </div>
+      )}
 
       <div className={`space-y-5 mb-6 ${isRtl ? 'rtl-container' : ''}`}>
         {pollOptions.map((option, index) => {
