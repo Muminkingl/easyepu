@@ -24,11 +24,43 @@ import {
 import { getAllUsers, UserData } from '@/lib/supabase';
 import { useUserRole } from '@/hooks/useUserRole';
 import * as XLSX from 'xlsx';
+import { useUser } from '@clerk/nextjs';
+
+// Add a helper function to format the user's display name
+function formatDisplayName(user: UserData): string {
+  // Use username from database if available
+  if (user.username) {
+    return user.username;
+  }
+  
+  // If no username, extract name from email (capitalized)
+  const emailName = user.email.split('@')[0];
+  return emailName.charAt(0).toUpperCase() + emailName.slice(1);
+}
+
+// Helper to get the initial letter for the avatar
+function getInitialLetter(user: UserData): string {
+  // Use first letter of username if available
+  if (user.username) {
+    return user.username.charAt(0).toUpperCase();
+  }
+  
+  // Otherwise use email initial
+  return user.email.charAt(0).toUpperCase();
+}
 
 // Create a fetcher function for SWR
 const usersFetcher = async () => {
   const data = await getAllUsers();
   return data;
+};
+
+// Add this type definition after imports and before component
+type ClerkUserData = {
+  id: string;
+  fullName: string;
+  imageUrl: string;
+  email: string;
 };
 
 export default function ManageUsersPage() {
@@ -45,6 +77,8 @@ export default function ManageUsersPage() {
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
   const [animateRefresh, setAnimateRefresh] = useState(false);
   const [isManualLoading, setIsManualLoading] = useState(false);
+  const { user: currentUser, isLoaded: isUserLoaded } = useUser();
+  const [clerkUsers, setClerkUsers] = useState<Record<string, ClerkUserData>>({});
   
   // Use SWR for data fetching with auto-refresh
   const { data, error, mutate } = useSWR('users', usersFetcher, {
@@ -55,6 +89,93 @@ export default function ManageUsersPage() {
   
   const users = data || [];
   const loading = isManualLoading || (!data && !error);
+
+  // Function to export users to Excel
+  const downloadExcel = () => {
+    // Skip if no users available
+    if (!users || users.length === 0) return;
+    
+    try {
+      // Create workbook and worksheet
+      const workbook = XLSX.utils.book_new();
+      
+      // Format data for Excel
+      const worksheetData = users.map(user => {
+        // Get Clerk user info if available
+        const clerkUser = clerkUsers[user.clerk_id];
+        const displayName = clerkUser?.fullName || formatDisplayName(user);
+        
+        return {
+          'Display Name': displayName,
+          'Username': user.username ? `@${user.username}` : 'Not Set',
+          'Email': user.email,
+          'Role': user.role || 'student',
+          'Phone Number': user.phone_number || 'Not provided',
+          'Gender': user.gender || 'Not specified',
+          'Group Class': user.group_class || 'Not assigned',
+          'Account Created': new Date(user.created_at).toLocaleString(),
+          'Last Updated': new Date(user.updated_at).toLocaleString()
+        };
+      });
+      
+      // Create a worksheet from the data
+      const worksheet = XLSX.utils.json_to_sheet(worksheetData);
+      
+      // Add worksheet to workbook
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Users');
+      
+      // Generate Excel file and trigger download
+      XLSX.writeFile(workbook, 'epu_users.xlsx');
+    } catch (err) {
+      console.error('Error generating Excel file:', err);
+      // Show error toast or notification
+    }
+  };
+
+  // Function to fetch Clerk user data
+  async function fetchClerkData() {
+    try {
+      const response = await fetch('/api/admin/get-users-clerk-data');
+      if (response.ok) {
+        const data = await response.json();
+        const userMap: Record<string, ClerkUserData> = {};
+        
+        if (data.users && Array.isArray(data.users)) {
+          data.users.forEach((user: ClerkUserData) => {
+            if (user.id) {
+              userMap[user.id] = user;
+            }
+          });
+        }
+        
+        setClerkUsers(userMap);
+        
+        // If users are loaded, retry fetching for any missing names after a delay
+        if (users.length > 0) {
+          const missingNames = users.filter(user => !userMap[user.clerk_id]?.fullName);
+          if (missingNames.length > 0) {
+            setTimeout(() => {
+              fetchClerkData();
+            }, 2000); // Retry after 2 seconds
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching Clerk data:', error);
+    }
+  }
+
+  // Effect to fetch Clerk data on component mount
+  useEffect(() => {
+    fetchClerkData();
+  }, []);
+
+  // Also fetch when users data changes
+  useEffect(() => {
+    if (users.length > 0) {
+      fetchClerkData();
+    }
+  }, [users]);
 
   // Filter users based on search term and filters
   useEffect(() => {
@@ -99,50 +220,17 @@ export default function ManageUsersPage() {
     
     setFilteredUsers(filtered);
   }, [users, searchTerm, roleFilter, sortBy, sortOrder]);
-  
-  // Function to download user data as Excel
-  const downloadExcel = () => {
-    // Create worksheet from filtered users
-    const worksheet = XLSX.utils.json_to_sheet(filteredUsers.map(user => ({
-      'Name': user.username || 'Not set',
-      'Email': user.email,
-      'Role': user.role || 'student',
-      'Group': user.group_class || 'Not assigned',
-      'Phone Number': user.phone_number || 'Not provided',
-      'Gender': user.gender || 'Not provided',
-      'Date Joined': user.created_at ? new Date(user.created_at).toLocaleDateString() : 'Unknown',
-    })));
-    
-    // Add column widths
-    const maxWidth = 50;
-    const wscols = [
-      { wch: 25 }, // Name
-      { wch: 35 }, // Email
-      { wch: 15 }, // Role
-      { wch: 15 }, // Group
-      { wch: 20 }, // Phone Number
-      { wch: 15 }, // Gender
-      { wch: 15 }, // Date Joined
-    ];
-    worksheet['!cols'] = wscols;
-    
-    // Create workbook and add the worksheet
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Users');
-    
-    // Generate filename with current date
-    const dateStr = new Date().toISOString().split('T')[0];
-    const filename = `Users_Export_${dateStr}.xlsx`;
-    
-    // Save to file
-    XLSX.writeFile(workbook, filename);
-  };
-  
+
   // Function to refresh the users data
   const refreshUserData = () => {
     setIsRefreshing(true);
     setAnimateRefresh(true);
     setIsManualLoading(true);
+    
+    // Clear clerk users data and refresh it
+    setClerkUsers({});
+    fetchClerkData();
+    
     mutate()
       .then(() => {
         setTimeout(() => {
@@ -470,6 +558,9 @@ export default function ManageUsersPage() {
                           Name
                         </th>
                         <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-indigo-300 uppercase tracking-wider">
+                          Username
+                        </th>
+                        <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-indigo-300 uppercase tracking-wider">
                           Email Address
                         </th>
                         <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-indigo-300 uppercase tracking-wider">
@@ -501,29 +592,40 @@ export default function ManageUsersPage() {
                         >
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex items-center">
-                              <div className={`h-10 w-10 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white font-bold transition-transform ${
+                              <div className={`h-10 w-10 rounded-full overflow-hidden bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white font-bold transition-transform ${
                                 selectedUser === user.clerk_id ? 'transform scale-110 ring-2 ring-indigo-300' : ''
                               }`}>
-                                {user.username 
-                                  ? user.username.charAt(0).toUpperCase()
-                                  : user.email.charAt(0).toUpperCase()}
+                                {clerkUsers[user.clerk_id] && clerkUsers[user.clerk_id].imageUrl ? (
+                                  <img 
+                                    src={clerkUsers[user.clerk_id].imageUrl} 
+                                    alt={clerkUsers[user.clerk_id].fullName || formatDisplayName(user)} 
+                                    className="h-full w-full object-cover"
+                                  />
+                                ) : (
+                                  getInitialLetter(user)
+                                )}
                               </div>
                               <div className="ml-4">
                                 <div className="text-sm font-medium text-indigo-100">
-                                  {user.username || 'Unnamed User'}
+                                  {clerkUsers[user.clerk_id]?.fullName || formatDisplayName(user)}
                                 </div>
-                                {!user.username && (
-                                  <div className="text-xs text-indigo-400">
-                                    Name not set
-                                  </div>
-                                )}
                               </div>
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center text-sm text-indigo-200">
-                              <Mail className="h-4 w-4 text-indigo-400 mr-2" />
-                              {user.email}
+                            {user.username ? (
+                              <div className="text-sm font-medium text-indigo-100">
+                                @{user.username}
+                              </div>
+                            ) : (
+                              <span className="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-amber-100/10 text-amber-100">
+                                Not Set
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-indigo-100">
+                              {user.email || (clerkUsers[user.clerk_id]?.email || 'No email')}
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
@@ -593,22 +695,28 @@ export default function ManageUsersPage() {
                     <div className="bg-gradient-to-r from-indigo-800 to-purple-800 h-16 relative">
                       <div className="absolute top-8 left-4">
                         <div className="h-16 w-16 rounded-full bg-indigo-900/50 p-1 shadow-md border border-indigo-700/50">
-                          <div className="h-full w-full rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white text-xl font-bold">
-                            {user.username 
-                              ? user.username.charAt(0).toUpperCase()
-                              : user.email.charAt(0).toUpperCase()}
+                          <div className="h-full w-full rounded-full overflow-hidden bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white text-xl font-bold">
+                            {clerkUsers[user.clerk_id] && clerkUsers[user.clerk_id].imageUrl ? (
+                              <img 
+                                src={clerkUsers[user.clerk_id].imageUrl} 
+                                alt={clerkUsers[user.clerk_id].fullName || formatDisplayName(user)} 
+                                className="h-full w-full object-cover"
+                              />
+                            ) : (
+                              getInitialLetter(user)
+                            )}
                           </div>
                         </div>
                       </div>
                     </div>
                     <div className="pt-12 p-4">
                       <h3 className="text-lg font-semibold text-indigo-100">
-                          {user.username || 'Unnamed User'}
-                        </h3>
+                        {clerkUsers[user.clerk_id]?.fullName || formatDisplayName(user)}
+                      </h3>
                       <div className="mt-2 space-y-2">
                         <div className="flex items-center text-sm text-indigo-200">
                           <Mail className="h-4 w-4 text-indigo-400 mr-2" />
-                          <span className="truncate">{user.email}</span>
+                          <span className="truncate">{user.email || (clerkUsers[user.clerk_id]?.email || 'No email')}</span>
                         </div>
                         {user.phone_number && (
                           <div className="flex items-center text-sm text-indigo-200">

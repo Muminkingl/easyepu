@@ -1047,105 +1047,46 @@ export async function getPollByAnnouncementId(announcementId: string): Promise<P
 export async function submitPollResponse(
   pollId: string,
   userId: string,
-  selectedOption: number
+  response: string,
+  username?: string | null,
+  email?: string | null,
+  gender?: string | null,
+  groupClass?: string | null
 ): Promise<boolean> {
   try {
-    if (!supabase) {
-      console.warn('Supabase not configured: Missing environment variables.');
+    // Always require at least userId and response
+    if (!pollId || !userId || !response || !supabase) {
+      console.error('Missing required fields for poll response or supabase client not initialized');
       return false;
     }
 
-    // Check if username columns exist by running a test query
-    try {
-      const { data: testData, error: testError } = await supabase
-        .from('poll_responses')
-        .select('username')
-        .limit(1);
-      
-      // If there's an error about column not existing, we'll use the simplified version
-      const columnsExist = !testError || !testError.message.includes("Could not find the");
-      
-      // First, get user data to ensure we have the username - only if columns exist
-      let userData = null;
-      if (columnsExist) {
-        const { data, error: userError } = await supabase
-          .from('users')
-          .select('username, email, gender, group_class')
-          .eq('clerk_id', userId)
-          .single();
-        
-        if (!userError) {
-          userData = data;
-        }
-      }
-
-      // Delete any existing responses for this user and poll to ensure clean state
-      const { error: deleteError } = await supabase
-        .from('poll_responses')
-        .delete()
-        .eq('poll_id', pollId)
-        .eq('user_id', userId);
-      
-      if (deleteError) {
-        console.error('Error deleting existing poll responses:', deleteError);
-        // Continue anyway, as this might be a new vote
-      }
-
-      // Insert the new response with or without user data based on column existence
-      const insertData = {
+    // Get the user data to ensure we have the most up-to-date username
+    const userData = await getUserData(userId);
+    
+    // Prepare insert data with all available user information
+    const insertData = {
         poll_id: pollId,
         user_id: userId,
-        selected_option: selectedOption
-      };
+      response: response,
+      created_at: new Date().toISOString(),
+      username: username || userData?.username || null,
+      email: email || userData?.email || null,
+      gender: gender || userData?.gender || null,
+      group_class: groupClass || userData?.group_class || null
+    };
 
-      // Only add these fields if the columns exist
-      if (columnsExist && userData) {
-        Object.assign(insertData, {
-          username: userData.username || null,
-          email: userData.email || null,
-          gender: userData.gender || null,
-          group_class: userData.group_class || null
-        });
-      }
+    const { error } = await supabase
+      .from('poll_responses')
+      .insert([insertData]);
 
-      const { error: insertError } = await supabase
-        .from('poll_responses')
-        .insert(insertData);
-
-      if (insertError) {
-        console.error('Error submitting poll response:', insertError);
-        return false;
-      }
-
-      return true;
-    } catch (queryError) {
-      console.error('Error checking column existence:', queryError);
-      
-      // Fallback to basic submission without the extra fields
-      const { error: deleteError } = await supabase
-        .from('poll_responses')
-        .delete()
-        .eq('poll_id', pollId)
-        .eq('user_id', userId);
-    
-      const { error: insertError } = await supabase
-        .from('poll_responses')
-        .insert({
-          poll_id: pollId,
-          user_id: userId,
-          selected_option: selectedOption
-        });
-
-      if (insertError) {
-        console.error('Error in fallback poll response submission:', insertError);
-        return false;
-      }
-      
-      return true;
+    if (error) {
+      console.error('Error submitting poll response:', error);
+      return false;
     }
+
+    return true;
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error('Error in submitPollResponse:', errorMessage);
+    console.error('Exception in submitPollResponse:', error);
     return false;
   }
 }
@@ -1326,7 +1267,7 @@ export async function getDetailedPollResults(pollId: string): Promise<EnhancedPo
                 email: lookupUser.email || user.email,
                 username: lookupUser.username || user.username,
                 group_class: lookupUser.group_class || user.group_class
-              };
+          };
             }
           }
         });

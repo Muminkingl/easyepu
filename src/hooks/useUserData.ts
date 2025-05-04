@@ -1,6 +1,6 @@
 import { useUser } from '@clerk/nextjs';
 import { useState, useEffect } from 'react';
-import { getUserData, upsertUser, updateUsername, updatePhoneNumber, updateGender, updateGroupClass, UserData, UserRole } from '@/lib/supabase';
+import { getUserData, upsertUser, updateUsername as updateUsernameInDB, updatePhoneNumber, updateGender, updateGroupClass, UserData, UserRole } from '@/lib/supabase';
 
 export function useUserData() {
   const { user, isLoaded, isSignedIn } = useUser();
@@ -44,11 +44,62 @@ export function useUserData() {
         // First, try to get existing user data to preserve role information
         const existingData = await getUserData(user.id);
         
-        // Only upsert with the role if it already exists
+        // Get the user's name prioritizing Google OAuth provider data
+        let displayName = null;
+        
+        // IMPORTANT: Look for the OAuth accounts that have the user's Google profile name
+        const googleAuth = user.externalAccounts?.find((account: any) => 
+          account.provider === 'google' || account.provider === 'oauth_google'
+        );
+        
+        if (googleAuth) {
+          // Direct access to the OAuth profile's display name from Google
+          console.log("Found Google account:", googleAuth);
+          
+          if (googleAuth.firstName && googleAuth.lastName) {
+            displayName = `${googleAuth.firstName} ${googleAuth.lastName}`;
+            console.log("Found Google name:", displayName);
+          } else if (googleAuth.username) {
+            displayName = googleAuth.username;
+            console.log("Found Google username:", displayName);
+          } else if (googleAuth.emailAddress) {
+            // Extract the display name from the email address if profile info not available
+            const emailParts = googleAuth.emailAddress.split('@');
+            if (emailParts.length > 0) {
+              displayName = emailParts[0].charAt(0).toUpperCase() + emailParts[0].slice(1);
+              console.log("Extracted name from Google email:", displayName);
+            }
+          }
+        }
+        
+        // If no name from Google OAuth, try standard name fields from Clerk
+        if (!displayName) {
+          if (user.fullName) {
+            displayName = user.fullName;
+          } else if (user.firstName && user.lastName) {
+            displayName = `${user.firstName} ${user.lastName}`;
+          } else if (user.firstName) {
+            displayName = user.firstName;
+          } 
+          // If no name from Clerk, create a proper name from email
+          else if (email) {
+            const emailName = email.split('@')[0];
+            // Convert formats like "ectc02m250005" to "Ectc02m250005"
+            displayName = emailName.charAt(0).toUpperCase() + emailName.slice(1);
+          }
+        }
+        
+        console.log("Final selected display name:", displayName);
+        
+        // Don't overwrite existing username if it's already set
+        const usernameToUse = existingData?.username || displayName;
+        
+        // ALWAYS use the best available name, prioritizing OAuth profile data
         await upsertUser({
           clerk_id: user.id,
           email: email,
-          role: existingData?.role // Preserve existing role if it exists
+          role: existingData?.role, // Preserve existing role if it exists
+          username: usernameToUse
         });
 
         // Get updated user data
@@ -69,11 +120,11 @@ export function useUserData() {
     fetchUserData();
   }, [isLoaded, isSignedIn, user]);
 
-  const updateUserUsername = async (username: string): Promise<boolean> => {
+  const updateUsername = async (username: string): Promise<boolean> => {
     if (!userData || !user) return false;
     
     try {
-      const success = await updateUsername(user.id, username);
+      const success = await updateUsernameInDB(user.id, username);
       if (success) {
         setUserData(prev => prev ? { ...prev, username } : null);
       }
@@ -114,7 +165,7 @@ export function useUserData() {
     }
   };
 
-  const updateUserGroupClass = async (groupClass: string): Promise<boolean> => {
+  const updateUserGroup = async (groupClass: string): Promise<boolean> => {
     if (!userData || !user) return false;
     
     try {
@@ -129,14 +180,16 @@ export function useUserData() {
     }
   };
 
+  const isAdmin = userData?.role === 'admin';
+
   return { 
     userData, 
+    isAdmin,
     isLoading, 
     error, 
-    isAdmin: userData?.role === 'admin',
-    updateUsername: updateUserUsername,
-    updatePhoneNumber: updateUserPhoneNumber,
-    updateGender: updateUserGender,
-    updateGroupClass: updateUserGroupClass
+    updateUsername,
+    updateUserPhoneNumber,
+    updateUserGender,
+    updateUserGroup
   };
-} 
+}

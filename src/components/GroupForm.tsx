@@ -16,7 +16,7 @@ export default function GroupForm({ userId, initialGroup, onUpdate }: GroupFormP
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
-  const { updateGroupClass } = useUserData();
+  const { updateUserGroup } = useUserData();
   const { t, dir } = useTranslations();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -26,7 +26,7 @@ export default function GroupForm({ userId, initialGroup, onUpdate }: GroupFormP
     setError('');
 
     try {
-      const updateSuccess = await updateGroupClass(group);
+      const updateSuccess = await updateUserGroup(group);
       
       if (!updateSuccess) {
         throw new Error('Failed to update group class');

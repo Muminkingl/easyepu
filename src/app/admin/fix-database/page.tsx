@@ -4,16 +4,20 @@ import { useState } from 'react';
 import { fixAnnouncementsTable, createPollsTable, updatePollResponsesTable } from '@/lib/fixDatabase';
 import { useUserRole } from '@/hooks/useUserRole';
 import Link from 'next/link';
-import { ChevronLeft, Database, RefreshCw, Loader2, CheckCircle, AlertTriangle } from 'lucide-react';
+import { ChevronLeft, Database, RefreshCw, Loader2, CheckCircle, AlertTriangle, Users } from 'lucide-react';
+import { clerkClient } from '@clerk/nextjs'; 
+import { getUserDataAction, updateUserUsernameAction } from '@/lib/actions';
 
 export default function FixDatabasePage() {
   const { isAdmin, isLoading } = useUserRole();
   const [isFixingAnnouncements, setIsFixingAnnouncements] = useState<boolean>(false);
   const [isCreatingPolls, setIsCreatingPolls] = useState<boolean>(false);
   const [isUpdatingPollResponses, setIsUpdatingPollResponses] = useState<boolean>(false);
+  const [isUpdatingUsernames, setIsUpdatingUsernames] = useState<boolean>(false);
   const [announcementsResult, setAnnouncementsResult] = useState<boolean | null>(null);
   const [pollsResult, setPollsResult] = useState<boolean | null>(null);
   const [pollResponsesResult, setPollResponsesResult] = useState<boolean | null>(null);
+  const [usernamesResult, setUsernamesResult] = useState<boolean | null>(null);
 
   if (isLoading) {
     return (
@@ -91,6 +95,40 @@ export default function FixDatabasePage() {
       setIsUpdatingPollResponses(false);
     }
   };
+
+  const handleUpdateUsernames = async () => {
+    setIsUpdatingUsernames(true);
+    setUsernamesResult(null);
+    
+    try {
+      // This is a server action - separate implementation needed
+      const success = await updateClerkUsernames();
+      setUsernamesResult(success);
+    } catch (error) {
+      console.error('Error updating usernames from Clerk:', error);
+      setUsernamesResult(false);
+    } finally {
+      setIsUpdatingUsernames(false);
+    }
+  };
+
+  // Function to update all usernames from Clerk data
+  async function updateClerkUsernames() {
+    try {
+      // This is a client-side representation - server-side implementation in actions.ts needed
+      const result = await fetch('/api/admin/update-usernames', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+      
+      return result.ok;
+    } catch (error) {
+      console.error('Error updating usernames:', error);
+      return false;
+    }
+  }
 
   return (
     <div className="min-h-screen bg-indigo-950 py-8 px-4 sm:px-6 lg:px-8">
@@ -272,6 +310,62 @@ export default function FixDatabasePage() {
                     {pollResponsesResult 
                       ? 'Poll responses table updated successfully!' 
                       : 'Failed to update poll responses table. Check console for details.'}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+          
+          {/* Update usernames from Clerk */}
+          <div className="bg-indigo-900/40 backdrop-blur-sm rounded-xl border border-indigo-800/30 p-6">
+            <div className="flex items-start mb-4">
+              <div className="flex-shrink-0 bg-indigo-800/50 rounded-lg p-3 mr-4">
+                <Users className="h-6 w-6 text-indigo-300" />
+              </div>
+                <div>
+                <h2 className="text-lg font-semibold text-indigo-100">Update All Usernames</h2>
+                <p className="mt-1 text-sm text-indigo-300">
+                  Sets usernames from Clerk data for all users who don't have a username set.
+                </p>
+              </div>
+            </div>
+            
+            <div className="mt-4">
+              <button
+                onClick={handleUpdateUsernames}
+                disabled={isUpdatingUsernames}
+                className="w-full py-2 px-4 bg-indigo-700/80 hover:bg-indigo-600/80 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+              >
+                {isUpdatingUsernames ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Updating Usernames...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Update All Usernames
+                  </>
+                )}
+              </button>
+            </div>
+            
+            {usernamesResult !== null && (
+              <div className={`mt-4 p-3 rounded-lg ${
+                usernamesResult 
+                  ? 'bg-green-900/20 text-green-300 border border-green-800/30' 
+                  : 'bg-red-900/20 text-red-300 border border-red-800/30'
+              }`}>
+                <div className="flex items-center">
+                  {usernamesResult ? (
+                    <CheckCircle className="h-5 w-5 mr-2 text-green-400" />
+                  ) : (
+                    <AlertTriangle className="h-5 w-5 mr-2 text-red-400" />
+                  )}
+                  <span>
+                    {usernamesResult 
+                      ? 'All usernames updated successfully!' 
+                      : 'Failed to update usernames. Check console for details.'}
                   </span>
                 </div>
               </div>

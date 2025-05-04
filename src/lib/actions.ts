@@ -343,7 +343,19 @@ export async function submitPollResponseAction(
   selectedOption: number
 ): Promise<boolean> {
   try {
-    return await submitPollResponse(pollId, userId, selectedOption);
+    // First get the user data to ensure we have the most up-to-date information
+    const userData = await getUserData(userId);
+    
+    // Submit poll response with all available user data
+    return await submitPollResponse(
+      pollId, 
+      userId, 
+      selectedOption.toString(),
+      userData?.username,
+      userData?.email,
+      userData?.gender,
+      userData?.group_class
+    );
   } catch (error) {
     console.error('Error in submitPollResponseAction:', error);
     throw new Error('Failed to submit poll response');

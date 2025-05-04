@@ -8,6 +8,7 @@ import { checkEnvironmentVariables } from "@/lib/debugUtils";
 import PhoneNumberForm from "@/components/PhoneNumberForm";
 import GenderForm from "@/components/GenderForm";
 import GroupForm from "@/components/GroupForm";
+import UsernameForm from "@/components/UsernameForm";
 import { getUserData } from '@/lib/supabase';
 import { useTranslations } from '@/lib/i18n';
 import { 
@@ -566,6 +567,27 @@ export default function ProfilePage() {
                     initialGroup={localUserData?.group_class || undefined} 
                     onUpdate={refreshUserData}
                   />
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          {/* Username Form Card */}
+          <div className="lg:col-span-3 mt-6 lg:mt-6">
+            <div className="bg-indigo-900/20 backdrop-blur-sm rounded-xl shadow-lg overflow-hidden transition-all duration-300 hover:shadow-xl border border-indigo-800/30 h-full">
+              <div className="h-full flex flex-col">
+                <div className="border-b border-indigo-800/30 p-6">
+                  <h2 className="text-xl font-bold text-white">
+                    {renderIconWithText(
+                      User, 
+                      t('profile.usernameInfo.title') || 'Username Settings'
+                    )}
+                  </h2>
+                  <p className="text-indigo-300 mt-1">{t('profile.usernameInfo.description') || 'Set your username (can only be set once)'}</p>
+                </div>
+                
+                <div className="flex-1 p-6">
+                  <UsernameForm />
                 </div>
               </div>
             </div>

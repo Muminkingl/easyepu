@@ -162,6 +162,8 @@
   "poll": {
     "completeProfileRequired": "You must complete your profile before voting",
     "completeProfileMessage": "Please set your gender and group class in your profile before participating in polls.",
+    "usernameRequired": "Username required for voting",
+    "usernameRequiredMessage": "You must set a username in your profile before participating in polls. This helps identify your votes to other participants.",
     "updateProfile": "Update Profile",
     "errorSubmitting": "Failed to submit your vote. Please try again.",
     "errorUpdating": "Failed to update your vote. Please try again.",
@@ -247,6 +249,10 @@
     "groupInfo": {
       "title": "Group Selection",
       "description": "Set your class group (A1 or A2)"
+    },
+    "usernameInfo": {
+      "title": "Username Settings",
+      "description": "Set your username (can only be set once)"
     }
   },
   "cookiePolicy": {
@@ -401,5 +407,26 @@
     "creator": "Creator",
     "profileRequired": "You must set your gender and group class in your profile before creating a group. Please go to your profile page to update this information.",
     "updateProfile": "Update Profile"
+  },
+  "username": {
+    "title": "Username",
+    "setUsername": "Set Your Username",
+    "usernameLabel": "Username",
+    "placeholder": "your_username",
+    "oneTimeWarning": "Important: You can only set your username once. After setting, it cannot be changed.",
+    "important": "Your username will be visible to other users and will be used across the platform.",
+    "save": "Save Username",
+    "saving": "Saving...",
+    "current": "Current Username",
+    "locked": "Locked",
+    "cannotChange": "Your username has been set and cannot be changed. This helps maintain consistency across the platform.",
+    "errors": {
+      "empty": "Username cannot be empty",
+      "tooShort": "Username must be at least 3 characters long",
+      "invalidChars": "Username can only contain letters, numbers, and underscores",
+      "taken": "This username is already taken or there was an error.",
+      "failed": "Failed to update username. Please try again."
+    },
+    "success": "Username updated successfully!"
   }
 } 
