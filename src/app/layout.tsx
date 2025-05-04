@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "EPU Student Announcements",
+  title: "EasyEPU",
   description: "A modern platform for EPU students to stay updated with the latest campus announcements.",
 };
 

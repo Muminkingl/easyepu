@@ -30,12 +30,12 @@ export default function Hero() {
           {/* Left content section */}
           <div className={`flex flex-col justify-center px-4 py-16 sm:px-6 lg:px-8 transition-all duration-700 ${animateHero ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'}`}>
             <div className="inline-block mb-4 px-4 py-1.5 bg-indigo-100 rounded-full">
-              <span className="text-sm font-medium text-indigo-800">EPU Official Platform</span>
+              <span className="text-sm font-medium text-indigo-800">EasyEPU Platform</span>
             </div>
             
             <h1 className="text-4xl font-extrabold tracking-tight text-gray-900 sm:text-5xl md:text-6xl">
-              <span className="block">EPU Student</span>
-              <span className="block text-indigo-600 mt-1">Announcements</span>
+              <span className="block">Easy</span>
+              <span className="block text-indigo-600 mt-1">EPU</span>
             </h1>
             
             <p className="mt-6 text-lg text-gray-600 max-w-lg">
