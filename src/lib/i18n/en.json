@@ -161,6 +161,7 @@
   },
   "poll": {
     "completeProfileRequired": "You must complete your profile before voting",
+    "profileRequiredMessage": "You must set your gender and class/group before you can vote in polls.",
     "completeProfileMessage": "Please set your gender and group class in your profile before participating in polls.",
     "usernameRequired": "Username required for voting",
     "usernameRequiredMessage": "You must set a username in your profile before participating in polls. This helps identify your votes to other participants.",
