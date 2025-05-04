@@ -64,4 +64,33 @@ export async function createPollsTable() {
     console.error('Error creating polls table:', error);
     return false;
   }
+}
+
+/**
+ * Update the poll_responses table to add user data columns
+ */
+export async function updatePollResponsesTable() {
+  try {
+    if (!supabase) {
+      console.error('Supabase not configured');
+      return false;
+    }
+
+    // Add username column if it doesn't exist
+    await supabase.rpc('add_username_to_poll_responses');
+    
+    // Add email column if it doesn't exist
+    await supabase.rpc('add_email_to_poll_responses');
+    
+    // Add gender column if it doesn't exist  
+    await supabase.rpc('add_gender_to_poll_responses');
+    
+    // Add group_class column if it doesn't exist
+    await supabase.rpc('add_group_class_to_poll_responses');
+
+    return true;
+  } catch (error) {
+    console.error('Error updating poll_responses table:', error);
+    return false;
+  }
 } 

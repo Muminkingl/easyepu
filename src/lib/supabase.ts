@@ -60,6 +60,10 @@ export type PollResponse = {
   user_id: string;
   selected_option: number;
   created_at: string;
+  username?: string | null;
+  email?: string | null;
+  gender?: string | null;
+  group_class?: string | null;
 };
 
 // Type for poll results
@@ -1051,8 +1055,19 @@ export async function submitPollResponse(
       return false;
     }
 
-    // First, delete any existing responses for this user and poll to ensure clean state
-    // This is a more aggressive approach to prevent duplicate votes
+    // First, get user data to ensure we have the username
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('username, email, gender, group_class')
+      .eq('clerk_id', userId)
+      .single();
+    
+    // If we couldn't find the user, log but continue with the vote
+    if (userError) {
+      console.warn('Warning: Could not fetch user data for voting user:', userError.message);
+    }
+
+    // Delete any existing responses for this user and poll to ensure clean state
     const { error: deleteError } = await supabase
       .from('poll_responses')
       .delete()
@@ -1064,13 +1079,18 @@ export async function submitPollResponse(
       // Continue anyway, as this might be a new vote
     }
 
-    // Insert the new response
+    // Insert the new response with user data
     const { error: insertError } = await supabase
       .from('poll_responses')
       .insert({
         poll_id: pollId,
         user_id: userId,
         selected_option: selectedOption,
+        // Include the username and other user data
+        username: userData?.username || null,
+        email: userData?.email || null,
+        gender: userData?.gender || null,
+        group_class: userData?.group_class || null
       });
 
     if (insertError) {
@@ -1219,46 +1239,52 @@ export async function getDetailedPollResults(pollId: string): Promise<EnhancedPo
       }
     });
     
-    // Step 2: Get all clerk_ids from responses
-    const clerkIds = validResponses.map(response => response.user_id);
+    // Create user data array directly from responses
+    const userData = validResponses.map(response => {
+      return {
+        user_id: response.user_id,
+        selected_option: response.selected_option,
+        gender: response.gender || undefined,
+        email: response.email || undefined,
+        username: response.username || null,
+        group_class: response.group_class || null
+      };
+    });
     
-    // Step 3: Get user data for these clerk_ids
-    let userData: {
-      user_id: string;
-      selected_option: number;
-      gender?: string;
-      email?: string;
-      username?: string | null;
-      group_class?: string | null;
-    }[] = [];
+    // For backward compatibility, if we have responses without usernames (old votes),
+    // try to look up the user data from the users table
+    const usersNeedingData = userData.filter(user => !user.username);
     
-    if (clerkIds.length > 0) {
+    if (usersNeedingData.length > 0) {
+      const clerkIds = usersNeedingData.map(user => user.user_id);
+      
       // Get all relevant users in a single query
       const { data: users, error: usersError } = await supabase
         .from('users')
         .select('clerk_id, gender, email, username, group_class')
         .in('clerk_id', clerkIds);
       
-      if (usersError) {
-        console.error('Error fetching user data:', usersError.message);
-      } else if (users) {
+      if (!usersError && users) {
         // Create a map for faster lookup
         const userMap = new Map();
         users.forEach(user => {
           userMap.set(user.clerk_id, user);
         });
         
-        // Create user data array with the matched user information
-        userData = validResponses.map(response => {
-          const user = userMap.get(response.user_id);
-          return {
-            user_id: response.user_id,
-            selected_option: response.selected_option,
-            gender: user?.gender || undefined,
-            email: user?.email || undefined,
-            username: user?.username || null,
-            group_class: user?.group_class || null
-          };
+        // Update user data with looked up information
+        userData.forEach((user, index) => {
+          if (!user.username) {
+            const lookupUser = userMap.get(user.user_id);
+            if (lookupUser) {
+              userData[index] = {
+                ...user,
+                gender: lookupUser.gender || user.gender,
+                email: lookupUser.email || user.email,
+                username: lookupUser.username || user.username,
+                group_class: lookupUser.group_class || user.group_class
+              };
+            }
+          }
         });
       }
     }
@@ -1278,13 +1304,7 @@ export async function getDetailedPollResults(pollId: string): Promise<EnhancedPo
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     console.error('Error getting detailed poll results:', errorMessage);
-    
-    // Return minimal result structure rather than null
-    return {
-      total_votes: 0,
-      options: [],
-      user_data: []
-    };
+    return null;
   }
 }
 
