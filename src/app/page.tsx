@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import LanguageSelector from '@/components/language';
 import { useTranslations } from '@/lib/i18n';
+import Image from 'next/image';
 
 export default function Home() {
   const [mounted, setMounted] = useState(false);
@@ -158,18 +159,12 @@ export default function Home() {
             <div className="relative mx-auto max-w-4xl">
               <div className="absolute inset-0 -z-10 bg-gradient-to-b from-indigo-500/20 to-purple-500/20 rounded-3xl blur-xl transform scale-105"></div>
               <div className="rounded-2xl overflow-hidden shadow-2xl shadow-indigo-500/20 border border-white/10 backdrop-blur-sm">
-                <div className="w-full h-12 bg-gray-900 flex items-center px-4">
-                  <div className="flex space-x-2">
-                    <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                    <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-                    <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                  </div>
-                </div>
-                <div className="w-full bg-gradient-to-br from-gray-900 to-indigo-900">
+                <div className="w-full bg-gradient-to-br from-gray-900 to-indigo-900 flex items-center justify-center">
                   <img 
-                    src="/dashboard.png" 
+                    src="https://i.imgur.com/1zzZC9f.png" 
                     alt="EASY EPU Dashboard" 
                     className="w-full h-auto"
+                    style={{ display: 'block' }}
                   />
                 </div>
               </div>

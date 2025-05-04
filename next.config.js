@@ -11,6 +11,13 @@ const nextConfig = {
       // your project has type errors.
       ignoreBuildErrors: true,
     },
+    // Configure images
+    images: {
+      unoptimized: true, // This helps with direct image loading
+      domains: ['i.imgur.com', 'imgur.com'],
+    },
+    // Output as a static site - this helps with images in the public folder
+    output: 'standalone',
   };
   
   module.exports = nextConfig;
