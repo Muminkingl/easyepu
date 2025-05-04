@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { deleteCourseFile } from '@/lib/supabase';
-import { auth } from '@clerk/nextjs';
+import { getAuth } from '@clerk/nextjs/server';
 
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> | { id: string } }
 ) {
   try {
-    const { userId } = auth();
+    const { userId } = getAuth(request);
     
     if (!userId) {
       return NextResponse.json(
