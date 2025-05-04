@@ -24,3 +24,22 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* RTL Poll Component Styles */
+.rtl-container > div {
+  padding-right: 0.5rem;
+  padding-left: 0.5rem;
+}
+
+.rtl-poll-spacing {
+  gap: 1.5rem;
+}
+
+[dir="rtl"] .text-right {
+  margin-right: 0.5rem;
+}
+
+.rtl-text {
+  padding-right: 0.5rem;
+  padding-left: 0.5rem;
+}

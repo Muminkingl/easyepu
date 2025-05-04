@@ -1,0 +1,793 @@
+'use server';
+
+import { 
+  updatePhoneNumber, 
+  updateGender, 
+  createAnnouncement, 
+  updateAnnouncement, 
+  deleteAnnouncement, 
+  createCourse, 
+  updateCourse, 
+  deleteCourse, 
+  debugUserAuth, 
+  createPoll, 
+  updatePoll, 
+  deletePoll, 
+  submitPollResponse, 
+  getDetailedPollResults, 
+  getPollById, 
+  Poll,
+  getCourseSections,
+  getCourseFiles,
+  getAllCourseFiles,
+  createCourseSection,
+  createCourseFile,
+  updateCourseProgress,
+  getUserCourseProgress,
+  CourseSection,
+  CourseFile,
+  CourseProgress,
+  deleteCourseSection,
+  deleteCourseFile,
+  createPresentationSection,
+  getPresentationSections,
+  createPresentationGroup,
+  getPresentationGroupsBySection,
+  getPresentationGroupMembers,
+  getUserPresentationGroup,
+  updatePresentationSection,
+  deletePresentationSection,
+  updatePresentationGroup,
+  updatePresentationGroupMembers,
+  PresentationSection,
+  PresentationGroup,
+  PresentationGroupMember,
+  getUserData,
+  UserData,
+  getPollResults,
+  PollResults,
+  getUserDataByEmail,
+  updateUsername,
+  updateGroupClass,
+  getCourses,
+  getCourseById,
+  getPollByAnnouncementId
+} from './supabase';
+
+/**
+ * Updates a user's phone number in the database
+ * @param userId The Clerk user ID
+ * @param phoneNumber The new phone number to save
+ * @returns A promise that resolves to true if the update was successful
+ */
+export async function updateUserPhoneNumber(userId: string, phoneNumber: string): Promise<boolean> {
+  try {
+    return await updatePhoneNumber(userId, phoneNumber);
+  } catch (error) {
+    console.error('Error in updateUserPhoneNumber action:', error);
+    throw new Error('Failed to update phone number');
+  }
+}
+
+/**
+ * Updates a user's gender in the database
+ * @param userId The Clerk user ID
+ * @param gender The gender to save
+ * @returns A promise that resolves to true if the update was successful
+ */
+export async function updateUserGender(userId: string, gender: string): Promise<boolean> {
+  try {
+    return await updateGender(userId, gender);
+  } catch (error) {
+    console.error('Error in updateUserGender action:', error);
+    throw new Error('Failed to update gender');
+  }
+}
+
+/**
+ * Creates a new announcement in the database
+ * @param userId The Clerk user ID of the creator
+ * @param title The announcement title
+ * @param content The announcement content
+ * @param published Whether the announcement is published
+ * @param important Whether the announcement is important
+ * @param targetAudience The target audience for the announcement
+ * @returns A promise that resolves to the announcement ID if successful, or null if failed
+ */
+export async function createAnnouncementAction(
+  userId: string,
+  title: string, 
+  content: string,
+  published: boolean = false,
+  important: boolean = false,
+  targetAudience: string = 'all'
+): Promise<string | null> {
+  try {
+    return await createAnnouncement(
+      title,
+      content,
+      userId,
+      published,
+      important,
+      targetAudience
+    );
+  } catch (error) {
+    console.error('Error in createAnnouncementAction:', error);
+    throw new Error('Failed to create announcement');
+  }
+}
+
+/**
+ * Updates an existing announcement in the database
+ * @param id The announcement ID
+ * @param updates The fields to update
+ * @returns A promise that resolves to true if the update was successful
+ */
+export async function updateAnnouncementAction(
+  id: string,
+  updates: {
+    title?: string;
+    content?: string;
+    published?: boolean;
+    important?: boolean;
+    target_audience?: string;
+  }
+): Promise<boolean> {
+  try {
+    return await updateAnnouncement(id, updates);
+  } catch (error) {
+    console.error('Error in updateAnnouncementAction:', error);
+    throw new Error('Failed to update announcement');
+  }
+}
+
+/**
+ * Deletes an announcement from the database
+ * @param id The announcement ID
+ * @returns A promise that resolves to true if the deletion was successful
+ */
+export async function deleteAnnouncementAction(id: string): Promise<boolean> {
+  try {
+    return await deleteAnnouncement(id);
+  } catch (error) {
+    console.error('Error in deleteAnnouncementAction:', error);
+    throw new Error('Failed to delete announcement');
+  }
+}
+
+/**
+ * Creates a new course in the database
+ * @param userId The Clerk user ID of the creator
+ * @param title The course title
+ * @param description The course description
+ * @param imageUrl URL to the course image
+ * @param backgroundColor Background color class for the course
+ * @param instructorName Name of the course instructor
+ * @param instructorTitle Title/position of the instructor
+ * @param instructorEmail Email of the instructor
+ * @param instructorImage URL to the instructor's profile image
+ * @returns A promise that resolves to the course ID if successful, null otherwise
+ */
+export async function createCourseAction(
+  userId: string,
+  title: string,
+  description: string | null = null,
+  imageUrl: string | null = null,
+  backgroundColor: string = 'bg-gray-300',
+  instructorName: string | null = null,
+  instructorTitle: string | null = null,
+  instructorEmail: string | null = null,
+  instructorImage: string | null = null
+): Promise<string | null> {
+  try {
+    const result = await createCourse(
+      title,
+      description,
+      imageUrl,
+      backgroundColor,
+      userId,
+      instructorName,
+      instructorTitle,
+      instructorEmail,
+      instructorImage
+    );
+    
+    if (!result) {
+      console.error('Course creation failed - returned null from createCourse');
+    }
+    
+    return result;
+  } catch (error) {
+    console.error('Error in createCourseAction:', error);
+    throw new Error('Failed to create course');
+  }
+}
+
+/**
+ * Updates an existing course in the database
+ * @param id The course ID
+ * @param updates The fields to update
+ * @returns A promise that resolves to true if the update was successful
+ */
+export async function updateCourseAction(
+  id: string,
+  updates: {
+    title?: string;
+    description?: string | null;
+    image_url?: string | null;
+    background_color?: string;
+    active?: boolean;
+    instructor_name?: string | null;
+    instructor_title?: string | null;
+    instructor_email?: string | null;
+    instructor_image?: string | null;
+  }
+): Promise<boolean> {
+  try {
+    return await updateCourse(id, updates);
+  } catch (error) {
+    console.error('Error in updateCourseAction:', error);
+    throw new Error('Failed to update course');
+  }
+}
+
+/**
+ * Deletes a course from the database
+ * @param id The course ID
+ * @returns A promise that resolves to true if the deletion was successful
+ */
+export async function deleteCourseAction(id: string): Promise<boolean> {
+  try {
+    return await deleteCourse(id);
+  } catch (error) {
+    console.error('Error in deleteCourseAction:', error);
+    throw new Error('Failed to delete course');
+  }
+}
+
+/**
+ * Debug function to check user auth and admin status
+ * @param userId The Clerk user ID 
+ * @returns Debug information about user authorization
+ */
+export async function debugAdminAuth(userId: string): Promise<any> {
+  try {
+    return await debugUserAuth(userId);
+  } catch (error) {
+    console.error('Error in debugAdminAuth:', error);
+    throw new Error('Failed to debug auth');
+  }
+}
+
+/**
+ * Creates a poll for an announcement
+ * @param announcementId The announcement ID
+ * @param title The poll title
+ * @param options Array of option texts
+ * @param description Optional description
+ * @param isActive Whether the poll is active
+ * @param endsAt Optional end date for the poll
+ * @returns A promise that resolves to the poll ID if successful
+ */
+export async function createPollAction(
+  announcementId: string,
+  title: string,
+  options: string[],
+  description: string | null = null,
+  isActive: boolean = true,
+  endsAt: string | null = null
+): Promise<string | null> {
+  try {
+    return await createPoll(
+      announcementId,
+      title,
+      options,
+      description,
+      isActive,
+      endsAt
+    );
+  } catch (error) {
+    console.error('Error in createPollAction:', error);
+    throw new Error('Failed to create poll');
+  }
+}
+
+/**
+ * Updates a poll
+ * @param id The poll ID
+ * @param updates The fields to update
+ * @returns A promise that resolves to true if successful
+ */
+export async function updatePollAction(
+  id: string,
+  updates: {
+    title?: string;
+    description?: string | null;
+    options?: string[];
+    is_active?: boolean;
+    ends_at?: string | null;
+  }
+): Promise<boolean> {
+  try {
+    return await updatePoll(id, updates);
+  } catch (error) {
+    console.error('Error in updatePollAction:', error);
+    throw new Error('Failed to update poll');
+  }
+}
+
+/**
+ * Deletes a poll
+ * @param id The poll ID
+ * @returns A promise that resolves to true if successful
+ */
+export async function deletePollAction(id: string): Promise<boolean> {
+  try {
+    return await deletePoll(id);
+  } catch (error) {
+    console.error('Error in deletePollAction:', error);
+    throw new Error('Failed to delete poll');
+  }
+}
+
+/**
+ * Submits a response to a poll
+ * @param pollId The poll ID
+ * @param userId The user ID
+ * @param selectedOption The index of the selected option
+ * @returns A promise that resolves to true if successful
+ */
+export async function submitPollResponseAction(
+  pollId: string,
+  userId: string,
+  selectedOption: number
+): Promise<boolean> {
+  try {
+    return await submitPollResponse(pollId, userId, selectedOption);
+  } catch (error) {
+    console.error('Error in submitPollResponseAction:', error);
+    throw new Error('Failed to submit poll response');
+  }
+}
+
+/**
+ * Gets detailed poll results including user data for admin
+ * @param pollId The poll ID
+ * @returns A promise that resolves to the detailed poll results if successful
+ */
+export async function getDetailedPollResultsAction(pollId: string): Promise<any> {
+  try {
+    // Directly fetch detailed results with user data
+    const detailedResults = await getDetailedPollResults(pollId);
+    
+    // Use fallback only if detailed results fail
+    if (!detailedResults) {
+      console.warn('Detailed poll results failed, falling back to basic results');
+      
+      try {
+        const basicResults = await getPollResults(pollId);
+        return {
+          ...basicResults,
+          user_data: [] // Empty user data for basic results
+        };
+      } catch (basicError) {
+        console.error('Even basic poll results failed:', basicError);
+        return {
+          total_votes: 0,
+          options: [],
+          user_data: []
+        };
+      }
+    }
+    
+    return detailedResults;
+  } catch (error) {
+    if (error instanceof Error) {
+      // Only log error message, not full error object to reduce console spam
+      console.error('Error in getDetailedPollResultsAction:', error.message);
+    }
+    // Return empty result object instead of throwing error
+    return {
+      total_votes: 0,
+      options: [],
+      user_data: []
+    };
+  }
+}
+
+/**
+ * Gets a poll by ID
+ * @param pollId The poll ID
+ * @returns A promise that resolves to the poll if successful
+ */
+export async function getPollByIdAction(pollId: string): Promise<Poll | null> {
+  try {
+    // Simple fetch without cache key parameter
+    return await getPollById(pollId);
+  } catch (error) {
+    console.error('Error in getPollByIdAction:', error);
+    throw new Error('Failed to get poll');
+  }
+}
+
+/**
+ * Get course sections for a specific course
+ * @param courseId The course ID
+ * @returns A promise that resolves to an array of course sections
+ */
+export async function getCourseSectionsAction(courseId: string): Promise<CourseSection[]> {
+  try {
+    return await getCourseSections(courseId);
+  } catch (error) {
+    console.error('Error in getCourseSectionsAction:', error);
+    throw new Error('Failed to get course sections');
+  }
+}
+
+/**
+ * Get files for a specific course section
+ * @param sectionId The section ID
+ * @returns A promise that resolves to an array of course files
+ */
+export async function getCourseFilesAction(sectionId: string): Promise<CourseFile[]> {
+  try {
+    return await getCourseFiles(sectionId);
+  } catch (error) {
+    console.error('Error in getCourseFilesAction:', error);
+    throw new Error('Failed to get course files');
+  }
+}
+
+/**
+ * Get all files for a course
+ * @param courseId The course ID
+ * @returns A promise that resolves to an array of course files
+ */
+export async function getAllCourseFilesAction(courseId: string): Promise<CourseFile[]> {
+  try {
+    return await getAllCourseFiles(courseId);
+  } catch (error) {
+    console.error('Error in getAllCourseFilesAction:', error);
+    throw new Error('Failed to get all course files');
+  }
+}
+
+/**
+ * Create a new course section
+ * @param courseId The course ID
+ * @param title The section title
+ * @param orderIndex The order index (position) of the section
+ * @returns A promise that resolves to the section ID if successful
+ */
+export async function createCourseSectionAction(
+  courseId: string,
+  title: string,
+  orderIndex: number = 0
+): Promise<string | null> {
+  try {
+    return await createCourseSection(courseId, title, orderIndex);
+  } catch (error) {
+    console.error('Error in createCourseSectionAction:', error);
+    throw new Error('Failed to create course section');
+  }
+}
+
+/**
+ * Create a new course file
+ * @param sectionId The section ID
+ * @param title The file title
+ * @param fileType The file type (extension)
+ * @param fileSize The file size (formatted string)
+ * @param fileUrl Optional URL to the file
+ * @param orderIndex The order index (position) of the file
+ * @returns A promise that resolves to the file ID if successful
+ */
+export async function createCourseFileAction(
+  sectionId: string,
+  title: string,
+  fileType: string,
+  fileSize: string,
+  fileUrl: string | null = null,
+  orderIndex: number = 0
+): Promise<string | null> {
+  try {
+    return await createCourseFile(sectionId, title, fileType, fileSize, fileUrl, orderIndex);
+  } catch (error) {
+    console.error('Error in createCourseFileAction:', error);
+    throw new Error('Failed to create course file');
+  }
+}
+
+/**
+ * Update course progress for a user
+ * @param userId The user ID
+ * @param courseId The course ID
+ * @param fileId The file ID
+ * @param completed Whether the file is completed
+ * @returns A promise that resolves to true if successful
+ */
+export async function updateCourseProgressAction(
+  userId: string,
+  courseId: string,
+  fileId: string,
+  completed: boolean
+): Promise<boolean> {
+  try {
+    return await updateCourseProgress(userId, courseId, fileId, completed);
+  } catch (error) {
+    console.error('Error in updateCourseProgressAction:', error);
+    throw new Error('Failed to update course progress');
+  }
+}
+
+/**
+ * Get course progress for a user
+ * @param userId The user ID
+ * @param courseId The course ID
+ * @returns A promise that resolves to an array of course progress objects
+ */
+export async function getUserCourseProgressAction(
+  userId: string,
+  courseId: string
+): Promise<CourseProgress[]> {
+  try {
+    return await getUserCourseProgress(userId, courseId);
+  } catch (error) {
+    console.error('Error in getUserCourseProgressAction:', error);
+    throw new Error('Failed to get user course progress');
+  }
+}
+
+/**
+ * Delete a course section and all its files
+ * @param id The section ID
+ * @returns A promise that resolves to true if the deletion was successful
+ */
+export async function deleteCourseSectionAction(id: string): Promise<boolean> {
+  try {
+    return await deleteCourseSection(id);
+  } catch (error) {
+    console.error('Error in deleteCourseSectionAction:', error);
+    throw new Error('Failed to delete course section');
+  }
+}
+
+/**
+ * Delete a course file
+ * @param id The file ID
+ * @returns A promise that resolves to true if the deletion was successful
+ */
+export async function deleteCourseFileAction(id: string): Promise<boolean> {
+  try {
+    return await deleteCourseFile(id);
+  } catch (error) {
+    console.error('Error in deleteCourseFileAction:', error);
+    throw new Error('Failed to delete course file');
+  }
+}
+
+/**
+ * Function to create a new presentation section (admin)
+ * @param adminId The admin ID
+ * @param title The section title
+ * @param maxMembers The maximum number of members in the section
+ * @param description Optional section description
+ * @returns A promise that resolves to the section ID if successful, or null if failed
+ */
+export async function createPresentationSectionAction(
+  adminId: string,
+  title: string,
+  maxMembers: number,
+  description: string | null = null
+): Promise<number | null> {
+  try {
+    return await createPresentationSection(adminId, title, maxMembers, description);
+  } catch (error) {
+    console.error('Error in createPresentationSectionAction:', error);
+    throw new Error('Failed to create presentation section');
+  }
+}
+
+/**
+ * Function to get all presentation sections
+ * @param activeOnly Whether to fetch only active sections
+ * @returns A promise that resolves to an array of presentation sections
+ */
+export async function getPresentationSectionsAction(
+  activeOnly: boolean = true
+): Promise<PresentationSection[]> {
+  try {
+    return await getPresentationSections(activeOnly);
+  } catch (error) {
+    console.error('Error in getPresentationSectionsAction:', error);
+    throw new Error('Failed to fetch presentation sections');
+  }
+}
+
+/**
+ * Function to create a presentation group (student)
+ * @param userId The user ID
+ * @param sectionId The section ID
+ * @param groupName Optional group name
+ * @param notes Optional group notes
+ * @param members Array of member objects
+ * @returns A promise that resolves to the group ID if successful, or null if failed
+ */
+export async function createPresentationGroupAction(
+  userId: string,
+  sectionId: number,
+  groupName: string | null = null,
+  notes: string | null = null,
+  members: { name: string; email?: string | null }[] = []
+): Promise<number | null> {
+  try {
+    return await createPresentationGroup(userId, sectionId, groupName, notes, members);
+  } catch (error) {
+    console.error('Error in createPresentationGroupAction:', error);
+    throw new Error('Failed to create presentation group');
+  }
+}
+
+/**
+ * Function to get presentation groups by section
+ * @param sectionId The section ID
+ * @returns A promise that resolves to an array of presentation groups
+ */
+export async function getPresentationGroupsBySectionAction(
+  sectionId: number
+): Promise<PresentationGroup[]> {
+  try {
+    return await getPresentationGroupsBySection(sectionId);
+  } catch (error) {
+    console.error('Error in getPresentationGroupsBySectionAction:', error);
+    throw new Error('Failed to fetch presentation groups');
+  }
+}
+
+/**
+ * Function to get members of a presentation group
+ * @param groupId The group ID
+ * @returns A promise that resolves to an array of presentation group members
+ */
+export async function getPresentationGroupMembersAction(
+  groupId: number
+): Promise<PresentationGroupMember[]> {
+  try {
+    return await getPresentationGroupMembers(groupId);
+  } catch (error) {
+    console.error('Error in getPresentationGroupMembersAction:', error);
+    throw new Error('Failed to fetch presentation group members');
+  }
+}
+
+/**
+ * Function to check if user is already in a group for a section
+ * @param userId The user ID
+ * @param sectionId The section ID
+ * @returns A promise that resolves to the group ID if successful, or null if failed
+ */
+export async function getUserPresentationGroupAction(
+  userId: string,
+  sectionId: number
+): Promise<number | null> {
+  try {
+    return await getUserPresentationGroup(userId, sectionId);
+  } catch (error) {
+    console.error('Error in getUserPresentationGroupAction:', error);
+    throw new Error('Failed to check user presentation group');
+  }
+}
+
+/**
+ * Function to update a presentation section (admin)
+ * @param adminId The admin ID
+ * @param sectionId The section ID
+ * @param updates The updates to apply
+ * @returns A promise that resolves to true if successful, or false if failed
+ */
+export async function updatePresentationSectionAction(
+  adminId: string,
+  sectionId: number,
+  updates: {
+    title?: string;
+    description?: string | null;
+    max_members?: number;
+    active?: boolean;
+  }
+): Promise<boolean> {
+  try {
+    return await updatePresentationSection(adminId, sectionId, updates);
+  } catch (error) {
+    console.error('Error in updatePresentationSectionAction:', error);
+    throw new Error('Failed to update presentation section');
+  }
+}
+
+/**
+ * Function to delete a presentation section (admin)
+ * @param adminId The admin ID
+ * @param sectionId The section ID
+ * @returns A promise that resolves to true if successful, or false if failed
+ */
+export async function deletePresentationSectionAction(
+  adminId: string,
+  sectionId: number
+): Promise<boolean> {
+  try {
+    return await deletePresentationSection(adminId, sectionId);
+  } catch (error) {
+    console.error('Error in deletePresentationSectionAction:', error);
+    throw new Error('Failed to delete presentation section');
+  }
+}
+
+/**
+ * Function to update a presentation group (student)
+ * @param userId The user ID (must be the group creator)
+ * @param groupId The group ID
+ * @param updates The updates to apply
+ * @returns A promise that resolves to true if successful, or false if failed
+ */
+export async function updatePresentationGroupAction(
+  userId: string,
+  groupId: number,
+  updates: {
+    name?: string | null;
+    notes?: string | null;
+  }
+): Promise<boolean> {
+  try {
+    return await updatePresentationGroup(userId, groupId, updates);
+  } catch (error) {
+    console.error('Error in updatePresentationGroupAction:', error);
+    throw new Error('Failed to update presentation group');
+  }
+}
+
+/**
+ * Function to update presentation group members
+ * @param userId The user ID (must be the group creator)
+ * @param groupId The group ID
+ * @param members The updated list of members
+ * @returns A promise that resolves to true if successful, or false if failed
+ */
+export async function updatePresentationGroupMembersAction(
+  userId: string,
+  groupId: number,
+  members: { id?: number; name: string; email?: string | null }[]
+): Promise<boolean> {
+  try {
+    return await updatePresentationGroupMembers(userId, groupId, members);
+  } catch (error) {
+    console.error('Error in updatePresentationGroupMembersAction:', error);
+    throw new Error('Failed to update presentation group members');
+  }
+}
+
+/**
+ * Function to get user data by clerk ID
+ * @param clerkId The clerk ID of the user
+ * @returns A promise that resolves to the user data if successful, or null if failed
+ */
+export async function getUserDataAction(clerkId: string): Promise<UserData | null> {
+  try {
+    return await getUserData(clerkId);
+  } catch (error) {
+    console.error('Error in getUserDataAction:', error);
+    throw new Error('Failed to get user data');
+  }
+}
+
+/**
+ * Gets poll results 
+ * @param pollId The poll ID
+ * @returns A promise that resolves to the poll results if successful
+ */
+export async function getPollResultsAction(pollId: string): Promise<PollResults | null> {
+  try {
+    return await getPollResults(pollId);
+  } catch (error) {
+    console.error('Error in getPollResultsAction:', error);
+    throw new Error('Failed to get poll results');
+  }
+} 
