@@ -1055,50 +1055,94 @@ export async function submitPollResponse(
       return false;
     }
 
-    // First, get user data to ensure we have the username
-    const { data: userData, error: userError } = await supabase
-      .from('users')
-      .select('username, email, gender, group_class')
-      .eq('clerk_id', userId)
-      .single();
-    
-    // If we couldn't find the user, log but continue with the vote
-    if (userError) {
-      console.warn('Warning: Could not fetch user data for voting user:', userError.message);
-    }
+    // Check if username columns exist by running a test query
+    try {
+      const { data: testData, error: testError } = await supabase
+        .from('poll_responses')
+        .select('username')
+        .limit(1);
+      
+      // If there's an error about column not existing, we'll use the simplified version
+      const columnsExist = !testError || !testError.message.includes("Could not find the");
+      
+      // First, get user data to ensure we have the username - only if columns exist
+      let userData = null;
+      if (columnsExist) {
+        const { data, error: userError } = await supabase
+          .from('users')
+          .select('username, email, gender, group_class')
+          .eq('clerk_id', userId)
+          .single();
+        
+        if (!userError) {
+          userData = data;
+        }
+      }
 
-    // Delete any existing responses for this user and poll to ensure clean state
-    const { error: deleteError } = await supabase
-      .from('poll_responses')
-      .delete()
-      .eq('poll_id', pollId)
-      .eq('user_id', userId);
-    
-    if (deleteError) {
-      console.error('Error deleting existing poll responses:', deleteError);
-      // Continue anyway, as this might be a new vote
-    }
+      // Delete any existing responses for this user and poll to ensure clean state
+      const { error: deleteError } = await supabase
+        .from('poll_responses')
+        .delete()
+        .eq('poll_id', pollId)
+        .eq('user_id', userId);
+      
+      if (deleteError) {
+        console.error('Error deleting existing poll responses:', deleteError);
+        // Continue anyway, as this might be a new vote
+      }
 
-    // Insert the new response with user data
-    const { error: insertError } = await supabase
-      .from('poll_responses')
-      .insert({
+      // Insert the new response with or without user data based on column existence
+      const insertData = {
         poll_id: pollId,
         user_id: userId,
-        selected_option: selectedOption,
-        // Include the username and other user data
-        username: userData?.username || null,
-        email: userData?.email || null,
-        gender: userData?.gender || null,
-        group_class: userData?.group_class || null
-      });
+        selected_option: selectedOption
+      };
 
-    if (insertError) {
-      console.error('Error submitting poll response:', insertError);
-      return false;
+      // Only add these fields if the columns exist
+      if (columnsExist && userData) {
+        Object.assign(insertData, {
+          username: userData.username || null,
+          email: userData.email || null,
+          gender: userData.gender || null,
+          group_class: userData.group_class || null
+        });
+      }
+
+      const { error: insertError } = await supabase
+        .from('poll_responses')
+        .insert(insertData);
+
+      if (insertError) {
+        console.error('Error submitting poll response:', insertError);
+        return false;
+      }
+
+      return true;
+    } catch (queryError) {
+      console.error('Error checking column existence:', queryError);
+      
+      // Fallback to basic submission without the extra fields
+      const { error: deleteError } = await supabase
+        .from('poll_responses')
+        .delete()
+        .eq('poll_id', pollId)
+        .eq('user_id', userId);
+    
+      const { error: insertError } = await supabase
+        .from('poll_responses')
+        .insert({
+          poll_id: pollId,
+          user_id: userId,
+          selected_option: selectedOption
+        });
+
+      if (insertError) {
+        console.error('Error in fallback poll response submission:', insertError);
+        return false;
+      }
+      
+      return true;
     }
-
-    return true;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     console.error('Error in submitPollResponse:', errorMessage);
