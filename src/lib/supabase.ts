@@ -1064,23 +1064,45 @@ export async function submitPollResponse(
     const userData = await getUserData(userId);
     
     // Prepare insert data with all available user information
-    const insertData = {
-        poll_id: pollId,
-        user_id: userId,
-      response: response,
-      created_at: new Date().toISOString(),
+    const responseData = {
+      selected_option: response,
       username: username || userData?.username || null,
       email: email || userData?.email || null,
       gender: gender || userData?.gender || null,
       group_class: groupClass || userData?.group_class || null
     };
 
-    const { error } = await supabase
+    // Check if the user has already voted for this poll
+    const { data: existingVote, error: checkError } = await supabase
       .from('poll_responses')
-      .insert([insertData]);
+      .select('id')
+      .eq('poll_id', pollId)
+      .eq('user_id', userId)
+      .single();
 
-    if (error) {
-      console.error('Error submitting poll response:', error);
+    let result;
+    
+    if (existingVote) {
+      // User already voted - update their vote
+      result = await supabase
+        .from('poll_responses')
+        .update(responseData)
+        .eq('poll_id', pollId)
+        .eq('user_id', userId);
+    } else {
+      // User hasn't voted yet - insert new vote
+      result = await supabase
+        .from('poll_responses')
+        .insert([{
+          poll_id: pollId,
+          user_id: userId,
+          created_at: new Date().toISOString(),
+          ...responseData
+        }]);
+    }
+
+    if (result.error) {
+      console.error('Error submitting poll response:', result.error);
       return false;
     }
 

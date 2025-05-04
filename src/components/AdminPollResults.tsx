@@ -846,10 +846,10 @@ export default function AdminPollResults({ pollId }: AdminPollResultsProps) {
                               </div>
                               <div className="ml-4">
                                 <div className="text-sm font-medium text-indigo-100 truncate max-w-[200px]">
-                                  {user.email || (user.user_id.startsWith('anonymous') ? 'Anonymous User' : 'Unknown User')}
+                                  {user.username || (user.email ? user.email.split('@')[0] : (user.user_id.startsWith('anonymous') ? 'Anonymous User' : 'Unknown User'))}
                                 </div>
                                 <div className="text-xs text-indigo-400 truncate max-w-[200px]">
-                                  {user.user_id}
+                                  {user.email || user.user_id}
                                 </div>
                               </div>
                             </div>
@@ -943,11 +943,12 @@ export default function AdminPollResults({ pollId }: AdminPollResultsProps) {
                       // Download user data as CSV
                       if (!results.user_data || results.user_data.length === 0) return;
                       
-                      const headers = ['User ID', 'Email', 'Gender', 'Group', 'Vote'];
+                      const headers = ['User ID', 'Username', 'Email', 'Gender', 'Group', 'Vote'];
                       const csvContent = [
                         headers.join(','),
                         ...results.user_data.map(user => [
                           user.user_id,
+                          user.username || (user.email ? user.email.split('@')[0] : 'Unknown'),
                           user.email || 'N/A',
                           user.gender || 'Unknown',
                           user.group_class || 'Not assigned',
