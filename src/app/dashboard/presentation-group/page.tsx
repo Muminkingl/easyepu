@@ -47,7 +47,7 @@ export default function PresentationGroupPage() {
   const [showJoinForm, setShowJoinForm] = useState(false);
   const [groupName, setGroupName] = useState('');
   const [notes, setNotes] = useState('');
-  const [members, setMembers] = useState<{ name: string; email: string }[]>([{ name: '', email: '' }]);
+  const [members, setMembers] = useState<{ name: string }[]>([{ name: '' }]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
@@ -61,7 +61,7 @@ export default function PresentationGroupPage() {
   const [editGroupNotes, setEditGroupNotes] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
   const [editingMembers, setEditingMembers] = useState(false);
-  const [membersList, setMembersList] = useState<{ id?: number; name: string; email: string }[]>([]);
+  const [membersList, setMembersList] = useState<{ id?: number; name: string }[]>([]);
   const [isUpdatingMembers, setIsUpdatingMembers] = useState(false);
 
   useEffect(() => {
@@ -125,7 +125,7 @@ export default function PresentationGroupPage() {
     setShowJoinForm(false);
     setGroupName('');
     setNotes('');
-    setMembers([{ name: '', email: '' }]);
+    setMembers([{ name: '' }]);
     setSuccessMessage('');
     setErrorMessage('');
     
@@ -145,13 +145,13 @@ export default function PresentationGroupPage() {
   const handleAddMember = () => {
     if (!selectedSection) return;
     
-    if (members.length >= selectedSection.max_members - 1) {
-      // Minus 1 because the current user is also a member
+    // Check if we've reached the max members limit
+    if (members.length >= selectedSection.max_members - 1) { // -1 for the creator
       setErrorMessage(`Maximum ${selectedSection.max_members} members allowed (including you)`);
       return;
     }
     
-    setMembers([...members, { name: '', email: '' }]);
+    setMembers([...members, { name: '' }]);
   };
 
   const handleRemoveMember = (index: number) => {
@@ -160,7 +160,7 @@ export default function PresentationGroupPage() {
     setMembers(newMembers);
   };
 
-  const handleMemberChange = (index: number, field: 'name' | 'email', value: string) => {
+  const handleMemberChange = (index: number, field: 'name', value: string) => {
     const newMembers = [...members];
     newMembers[index] = { ...newMembers[index], [field]: value };
     setMembers(newMembers);
@@ -195,33 +195,37 @@ export default function PresentationGroupPage() {
       // Filter out empty members
       const validMembers = members.filter(m => m.name.trim());
       
+      // Group name and notes are no longer needed - they'll be handled automatically by the backend
       const groupId = await createPresentationGroupAction(
         user.id,
         selectedSection.id,
-        groupName.trim() || null,
-        notes.trim() || null,
-        validMembers
+        null, // name will be auto-generated
+        null, // no notes
+        validMembers.map(m => ({ name: m.name })) // only include name for members
       );
 
       if (groupId) {
-        setSuccessMessage('Presentation group created successfully!');
-        // Update the UI to show the user is now in a group for this section
+        setSuccessMessage('Group created successfully!');
+        // Update our list of groups the user is in
         setMyGroups(new Map(myGroups).set(selectedSection.id, groupId));
+        
+        // Load the groups for this section again to update the list
+        const sectionGroups = await getPresentationGroupsBySectionAction(selectedSection.id);
+        setGroups(new Map(groups).set(selectedSection.id, sectionGroups));
+        
         // Reset form
         setShowJoinForm(false);
         setGroupName('');
         setNotes('');
-        setMembers([{ name: '', email: '' }]);
+        setMembers([{ name: '' }]);
         // Load the group members
         await loadGroupMembers(groupId);
-        // Refresh the sections and groups
-        await loadSections();
       } else {
-        setErrorMessage('Failed to create presentation group');
+        setErrorMessage('Failed to create group. You may already be in a group for this section.');
       }
     } catch (error) {
-      console.error('Error creating presentation group:', error);
-      setErrorMessage('An error occurred while creating the presentation group');
+      console.error('Error creating group:', error);
+      setErrorMessage('An error occurred while creating the group');
     } finally {
       setIsSubmitting(false);
     }
@@ -244,7 +248,7 @@ export default function PresentationGroupPage() {
     const currentGroup = groups.get(selectedSection!.id)?.find(g => g.id === groupId);
     if (currentGroup) {
       setEditingGroupId(groupId);
-      setEditGroupName(currentGroup.name || '');
+      // No longer setting editGroupName since the name is auto-generated and read-only
       setEditGroupNotes(currentGroup.notes || '');
     }
   };
@@ -265,11 +269,12 @@ export default function PresentationGroupPage() {
     setSuccessMessage('');
 
     try {
+      // Only allow editing notes, not the group name (group name is auto-generated)
       const success = await updatePresentationGroupAction(
         user.id,
         editingGroupId,
         {
-          name: editGroupName.trim() || null,
+          name: null, // Don't update name
           notes: editGroupNotes.trim() || null
         }
       );
@@ -291,18 +296,20 @@ export default function PresentationGroupPage() {
     }
   };
 
-  // Start editing members
+  // Load group members for editing
   const startEditingMembers = (groupId: number) => {
-    if (!groupMembers.has(groupId)) return;
+    if (!groupMembers.has(groupId)) {
+      loadGroupMembers(groupId);
+    }
     
-    // Get all non-creator members
-    const allMembers = groupMembers.get(groupId)!;
-    const nonCreatorMembers = allMembers
+    const members = groupMembers.get(groupId) || [];
+    
+    // Filter out the creator and map to the format we need
+    const nonCreatorMembers = members
       .filter(m => !m.is_creator)
       .map(m => ({
         id: m.id,
-        name: m.name,
-        email: m.email || ''
+        name: m.name
       }));
     
     setMembersList(nonCreatorMembers);
@@ -325,7 +332,7 @@ export default function PresentationGroupPage() {
       return;
     }
     
-    setMembersList([...membersList, { name: '', email: '' }]);
+    setMembersList([...membersList, { name: '' }]);
   };
 
   // Remove a member from the edit list
@@ -336,7 +343,7 @@ export default function PresentationGroupPage() {
   };
 
   // Handle member field changes
-  const handleExistingMemberChange = (index: number, field: 'name' | 'email', value: string) => {
+  const handleExistingMemberChange = (index: number, field: 'name', value: string) => {
     const newMembersList = [...membersList];
     newMembersList[index] = { ...newMembersList[index], [field]: value };
     setMembersList(newMembersList);
@@ -436,12 +443,16 @@ export default function PresentationGroupPage() {
     const currentGroup = groups.get(selectedSection.id)?.find(g => g.id === groupId);
     const isEditing = editingGroupId === groupId;
     
+    if (!currentGroup) return null; // Add safety check for currentGroup
+    
     return (
       <div className="mb-6">
         <div className="bg-green-900/20 text-green-100 p-4 rounded-lg border border-green-800/30 mb-4 flex justify-between items-start">
           <div className="flex items-center">
             <CheckCircle className="h-5 w-5 mr-2 text-green-400" />
-            <span className="font-medium">{t('presentationGroupPage.yourGroup')}</span>
+            <span className="font-medium">
+              {t('presentationGroupPage.yourGroup')}: <strong>{currentGroup.name}</strong>
+            </span>
           </div>
           <div className="flex space-x-2">
             {!isEditing && !editingMembers && (
@@ -452,13 +463,6 @@ export default function PresentationGroupPage() {
                 >
                   <Users className="h-4 w-4 mr-1" />
                   {t('presentationGroupPage.editMembers')}
-                </button>
-                <button
-                  onClick={() => startEditingGroup(groupId)}
-                  className="p-2 bg-indigo-700/30 hover:bg-indigo-600/40 rounded text-indigo-200 flex items-center text-sm"
-                >
-                  <Edit className="h-4 w-4 mr-1" />
-                  {t('presentationGroupPage.editDetails')}
                 </button>
               </>
             )}
@@ -472,17 +476,18 @@ export default function PresentationGroupPage() {
             
             <div className="space-y-4 mb-4">
               <div>
-                <label htmlFor="editGroupName" className="block text-sm font-medium text-indigo-200 mb-1">
+                <label className="block text-sm font-medium text-indigo-200 mb-1">
                   {t('presentationGroupPage.groupName')}
                 </label>
-                <input
-                  id="editGroupName"
-                  type="text"
-                  value={editGroupName}
-                  onChange={(e) => setEditGroupName(e.target.value)}
-                  placeholder={t('presentationGroupPage.groupNameOptional')}
-                  className="w-full px-3 py-2 bg-indigo-700/30 border border-indigo-600/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-indigo-100"
-                />
+                <div className="w-full px-3 py-2 bg-indigo-700/30 border border-indigo-600/50 rounded-lg text-indigo-100">
+                  {currentGroup?.name || ''}
+                  <span className="ml-2 text-xs bg-indigo-600/50 text-indigo-200 px-2 py-0.5 rounded-full">
+                    {t('presentationGroupPage.autoGenerated')}
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-indigo-400">
+                  {t('presentationGroupPage.groupNameCannotBeChanged')}
+                </p>
               </div>
               
               <div>
@@ -568,13 +573,6 @@ export default function PresentationGroupPage() {
                         placeholder={t('presentationGroupPage.memberName')}
                         className="w-full px-3 py-2 bg-indigo-700/30 border border-indigo-600/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-indigo-100 placeholder-indigo-400/70 mb-2"
                         required
-                      />
-                      <input
-                        type="text"
-                        value={member.email}
-                        onChange={(e) => handleExistingMemberChange(index, 'email', e.target.value)}
-                        placeholder={t('presentationGroupPage.emailOptional')}
-                        className="w-full px-3 py-2 bg-indigo-700/30 border border-indigo-600/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-indigo-100 placeholder-indigo-400/70"
                       />
                     </div>
                     <button
@@ -829,34 +827,6 @@ export default function PresentationGroupPage() {
                         <h3 className="text-lg font-medium text-indigo-100 mb-4">{t('presentationGroupPage.createNewGroup')}</h3>
                         
                         <div className="mb-4">
-                          <label htmlFor="groupName" className="block text-sm font-medium text-indigo-200 mb-1">
-                            {t('presentationGroupPage.groupNameOptional')}
-                          </label>
-                          <input
-                            type="text"
-                            id="groupName"
-                            value={groupName}
-                            onChange={(e) => setGroupName(e.target.value)}
-                            placeholder={t('presentationGroupPage.teamNamePlaceholder')}
-                            className="w-full px-3 py-2 bg-indigo-700/30 border border-indigo-600/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-indigo-100 placeholder-indigo-400/70"
-                          />
-                        </div>
-
-                        <div className="mb-4">
-                          <label htmlFor="notes" className="block text-sm font-medium text-indigo-200 mb-1">
-                            {t('presentationGroupPage.notesOptional')}
-                          </label>
-                          <textarea
-                            id="notes"
-                            value={notes}
-                            onChange={(e) => setNotes(e.target.value)}
-                            placeholder={t('presentationGroupPage.notesPlaceholder')}
-                            rows={2}
-                            className="w-full px-3 py-2 bg-indigo-700/30 border border-indigo-600/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-indigo-100 placeholder-indigo-400/70"
-                          />
-                        </div>
-
-                        <div className="mb-4">
                           <div className="flex justify-between items-center mb-2">
                             <label className="block text-sm font-medium text-indigo-200">
                               {t('presentationGroupPage.groupMembers')}
@@ -898,13 +868,6 @@ export default function PresentationGroupPage() {
                                     placeholder={t('presentationGroupPage.memberName')}
                                     className="w-full px-3 py-2 bg-indigo-700/30 border border-indigo-600/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-indigo-100 placeholder-indigo-400/70 mb-2"
                                     required
-                                  />
-                                  <input
-                                    type="text"
-                                    value={member.email}
-                                    onChange={(e) => handleMemberChange(index, 'email', e.target.value)}
-                                    placeholder={t('presentationGroupPage.emailOptional')}
-                                    className="w-full px-3 py-2 bg-indigo-700/30 border border-indigo-600/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-indigo-100 placeholder-indigo-400/70"
                                   />
                                 </div>
                                 <button

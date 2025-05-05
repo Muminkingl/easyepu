@@ -1872,6 +1872,34 @@ export async function createPresentationGroup(
       return null;
     }
 
+    // Get all existing groups in this section to determine the next group number
+    const { data: existingGroups, error: groupsError } = await supabase
+      .from('presentation_groups')
+      .select('id, name')
+      .eq('section_id', sectionId);
+    
+    if (groupsError) {
+      console.error('Error fetching existing groups:', groupsError);
+      return null;
+    }
+    
+    // Generate automatic group name (G1, G2, etc.)
+    // First, find the highest existing group number
+    let highestGroupNum = 0;
+    if (existingGroups && existingGroups.length > 0) {
+      existingGroups.forEach(group => {
+        if (group.name && group.name.startsWith('G')) {
+          const numPart = parseInt(group.name.substring(1));
+          if (!isNaN(numPart) && numPart > highestGroupNum) {
+            highestGroupNum = numPart;
+          }
+        }
+      });
+    }
+    
+    // Set the name to G1, G2, etc. - always use auto-generated name regardless of input
+    const autoGroupName = `G${highestGroupNum + 1}`;
+
     // Start a transaction to insert group and members
     const { data: userData } = await supabase
       .from('users')
@@ -1879,14 +1907,14 @@ export async function createPresentationGroup(
       .eq('clerk_id', userId)
       .single();
 
-    // Insert the group
+    // Insert the group with auto-generated name
     const { data: groupData, error: groupError } = await supabase
       .from('presentation_groups')
       .insert({
         section_id: sectionId,
-        name: groupName,
+        name: autoGroupName, // Always use the auto-generated name
         created_by: userId,
-        notes,
+        notes, // Keep notes field for compatibility, even if UI doesn't show it
       })
       .select('id')
       .single();
@@ -2117,23 +2145,34 @@ export async function deletePresentationSection(
       return false;
     }
 
-    // If there are groups, we should not delete the section
+    // If there are groups, we need to delete them first (cascading delete)
     if (groups && groups.length > 0) {
-      // Instead of deleting, mark it as inactive
-      const { error: updateError } = await supabase
-        .from('presentation_sections')
-        .update({ active: false })
-        .eq('id', sectionId);
-
-      if (updateError) {
-        console.error('Error deactivating section:', updateError);
+      const groupIds = groups.map(g => g.id);
+      
+      // 1. First delete all group members for these groups
+      const { error: membersDeleteError } = await supabase
+        .from('presentation_group_members')
+        .delete()
+        .in('group_id', groupIds);
+        
+      if (membersDeleteError) {
+        console.error('Error deleting group members:', membersDeleteError);
         return false;
       }
-
-      return true;
+      
+      // 2. Then delete all the groups themselves
+      const { error: groupsDeleteError } = await supabase
+        .from('presentation_groups')
+        .delete()
+        .in('id', groupIds);
+        
+      if (groupsDeleteError) {
+        console.error('Error deleting groups:', groupsDeleteError);
+        return false;
+      }
     }
 
-    // If no groups, we can safely delete the section
+    // 3. Finally delete the section itself
     const { error } = await supabase
       .from('presentation_sections')
       .delete()

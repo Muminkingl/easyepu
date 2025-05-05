@@ -213,14 +213,31 @@ export default function PresentationGroupsAdminPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  // Handle section delete confirmation
+  const confirmDelete = (sectionId: number) => {
+    setDeleteConfirmation(sectionId);
+  };
+
   // Handle section delete
   const handleDelete = async (sectionId: number) => {
     if (!user?.id) return;
     
     try {
+      // First check if there are groups in this section
+      if (!sectionGroups.has(sectionId)) {
+        await loadGroupsForSection(sectionId);
+      }
+      
+      const groups = sectionGroups.get(sectionId) || [];
+      const hasGroups = groups.length > 0;
+      
       const success = await deletePresentationSectionAction(user.id, sectionId);
       if (success) {
-        setSuccessMessage("Section removed successfully");
+        if (hasGroups) {
+          setSuccessMessage(`Section and ${groups.length} associated group${groups.length !== 1 ? 's' : ''} removed successfully`);
+        } else {
+          setSuccessMessage("Section removed successfully");
+        }
         loadSections();
       } else {
         setErrorMessage("Failed to remove section");
@@ -231,6 +248,53 @@ export default function PresentationGroupsAdminPage() {
     } finally {
       setDeleteConfirmation(null);
     }
+  };
+
+  // Renders the delete confirmation dialog
+  const renderDeleteConfirmation = (section: PresentationSection) => {
+    if (deleteConfirmation !== section.id) return null;
+    
+    // Check if there are groups in this section
+    const groups = sectionGroups.get(section.id) || [];
+    const hasGroups = groups.length > 0;
+    
+    return (
+      <div className="absolute inset-0 bg-indigo-900/80 backdrop-blur-sm flex items-center justify-center z-10 p-4">
+        <div className="bg-indigo-800 border border-indigo-600 rounded-lg shadow-lg p-6 max-w-md w-full">
+          <h3 className="text-xl font-bold text-indigo-50 mb-4">Confirm Deletion</h3>
+          
+          {hasGroups ? (
+            <>
+              <p className="text-indigo-200 mb-3">
+                <strong className="text-red-400">Warning:</strong> This section contains {groups.length} group{groups.length !== 1 ? 's' : ''}.
+              </p>
+              <p className="text-indigo-200 mb-4">
+                Deleting this section will permanently remove all associated groups and student data. This action cannot be undone.
+              </p>
+            </>
+          ) : (
+            <p className="text-indigo-200 mb-4">
+              Are you sure you want to delete the section "{section.title}"? This action cannot be undone.
+            </p>
+          )}
+          
+          <div className="flex justify-end space-x-3">
+            <button
+              onClick={() => setDeleteConfirmation(null)}
+              className="px-4 py-2 bg-indigo-700 hover:bg-indigo-600 text-white rounded-md transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => handleDelete(section.id)}
+              className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-md transition-colors"
+            >
+              {hasGroups ? "Delete Section & All Groups" : "Delete Section"}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   // Cancel edit mode
@@ -730,51 +794,21 @@ export default function PresentationGroupsAdminPage() {
                       </button>
                       <button
                         onClick={() => handleEdit(section)}
-                        className="p-1.5 hover:bg-indigo-700/50 rounded-full transition-colors ml-1"
+                        className="p-1.5 hover:bg-indigo-900/30 rounded-full transition-colors"
                         aria-label="Edit"
                       >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          className="h-5 w-5 text-indigo-300"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                          />
-                        </svg>
+                        <Pencil className="h-5 w-5 text-indigo-300" />
                       </button>
                       
-                      {deleteConfirmation === section.id ? (
-                        <div className="flex items-center ml-2">
-                          <button
-                            onClick={() => handleDelete(section.id)}
-                            className="p-1.5 bg-red-800/50 hover:bg-red-700/70 rounded-full transition-colors"
-                            aria-label="Confirm Delete"
-                          >
-                            <CheckCircleIcon className="h-5 w-5 text-red-300" />
-                          </button>
-                          <button
-                            onClick={() => setDeleteConfirmation(null)}
-                            className="p-1.5 bg-gray-800/50 hover:bg-gray-700/70 rounded-full transition-colors ml-1"
-                            aria-label="Cancel Delete"
-                          >
-                            <XCircle className="h-5 w-5 text-gray-300" />
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => setDeleteConfirmation(section.id)}
-                          className="p-1.5 hover:bg-red-900/30 rounded-full transition-colors ml-1"
-                          aria-label="Delete"
-                        >
-                          <TrashIcon className="h-5 w-5 text-red-400" />
-                        </button>
-                      )}
+                      {renderDeleteConfirmation(section)}
+                      
+                      <button
+                        onClick={() => confirmDelete(section.id)}
+                        className="p-1.5 hover:bg-red-900/30 rounded-full transition-colors ml-1"
+                        aria-label="Delete"
+                      >
+                        <TrashIcon className="h-5 w-5 text-red-400" />
+                      </button>
                     </div>
                   </div>
                 </div>
