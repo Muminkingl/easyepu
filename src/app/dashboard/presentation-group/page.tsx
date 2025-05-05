@@ -31,7 +31,8 @@ import {
   XCircle,
   Edit,
   Save,
-  UserPlus
+  UserPlus,
+  AlertTriangle
 } from 'lucide-react';
 import Link from 'next/link';
 import { useTranslations } from '@/lib/i18n';
@@ -264,6 +265,15 @@ export default function PresentationGroupPage() {
   const saveGroupChanges = async () => {
     if (!user?.id || !editingGroupId) return;
 
+    // Check if user has set their gender and group class
+    if (!userData?.gender || !userData?.group_class) {
+      setErrorMessage(
+        'You must set your gender and group class in your profile before updating group details.'
+      );
+      setIsUpdating(false);
+      return;
+    }
+
     setIsUpdating(true);
     setErrorMessage('');
     setSuccessMessage('');
@@ -298,6 +308,14 @@ export default function PresentationGroupPage() {
 
   // Load group members for editing
   const startEditingMembers = (groupId: number) => {
+    // Check if user has set their gender and group class first
+    if (!userData?.gender || !userData?.group_class) {
+      setErrorMessage(
+        'You must set your gender and group class in your profile before editing group members.'
+      );
+      return;
+    }
+    
     if (!groupMembers.has(groupId)) {
       loadGroupMembers(groupId);
     }
@@ -353,6 +371,14 @@ export default function PresentationGroupPage() {
   const saveMemberChanges = async () => {
     if (!user?.id || !selectedSection || !myGroups.has(selectedSection.id)) return;
     
+    // Check if user has set their gender and group class
+    if (!userData?.gender || !userData?.group_class) {
+      setErrorMessage(
+        'You must set your gender and group class in your profile before updating group members.'
+      );
+      return;
+    }
+    
     const groupId = myGroups.get(selectedSection.id)!;
     
     // Validate members
@@ -400,19 +426,20 @@ export default function PresentationGroupPage() {
     }
     
     return (
-      <div className="mb-4 p-4 bg-red-900/30 border border-red-800/30 rounded-lg text-red-100">
-        <div className="flex items-start">
-          <XCircle className="h-5 w-5 text-red-400 mt-0.5 mr-2 flex-shrink-0" />
-          <div>
-            <p className="font-medium">{t('presentationGroupPage.profileRequired')}</p>
-            <Link 
-              href="/dashboard/profile" 
-              className="mt-2 inline-block px-3 py-1.5 bg-indigo-600/80 text-white text-xs font-medium rounded hover:bg-indigo-500/80 transition-colors"
-            >
-              {t('presentationGroupPage.updateProfile')}
-            </Link>
-          </div>
+      <div className="mb-6 bg-amber-900/30 text-amber-300 p-4 rounded-lg border border-amber-800/30 flex flex-col">
+        <div className="flex items-center mb-2">
+          <AlertTriangle className="h-5 w-5 mr-2" />
+          <span className="font-medium">{t('presentationGroupPage.profileRequired')}</span>
         </div>
+        <p className="mb-3 text-sm">
+          {t('presentationGroupPage.profileRequiredMessage')}
+        </p>
+        <Link 
+          href="/dashboard/profile" 
+          className="self-start px-4 py-2 bg-amber-800/50 hover:bg-amber-700/50 text-amber-100 rounded-lg transition-colors text-sm"
+        >
+          {t('presentationGroupPage.updateProfile')}
+        </Link>
       </div>
     );
   };
@@ -825,7 +852,7 @@ export default function PresentationGroupPage() {
                     >
                       <form onSubmit={handleCreateGroup} className="bg-indigo-800/30 rounded-lg border border-indigo-700/30 p-4">
                         <h3 className="text-lg font-medium text-indigo-100 mb-4">{t('presentationGroupPage.createNewGroup')}</h3>
-                        
+
                         <div className="mb-4">
                           <div className="flex justify-between items-center mb-2">
                             <label className="block text-sm font-medium text-indigo-200">

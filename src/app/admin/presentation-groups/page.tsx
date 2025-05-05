@@ -236,7 +236,7 @@ export default function PresentationGroupsAdminPage() {
         if (hasGroups) {
           setSuccessMessage(`Section and ${groups.length} associated group${groups.length !== 1 ? 's' : ''} removed successfully`);
         } else {
-          setSuccessMessage("Section removed successfully");
+        setSuccessMessage("Section removed successfully");
         }
         loadSections();
       } else {
@@ -802,13 +802,13 @@ export default function PresentationGroupsAdminPage() {
                       
                       {renderDeleteConfirmation(section)}
                       
-                      <button
+                          <button
                         onClick={() => confirmDelete(section.id)}
-                        className="p-1.5 hover:bg-red-900/30 rounded-full transition-colors ml-1"
-                        aria-label="Delete"
-                      >
-                        <TrashIcon className="h-5 w-5 text-red-400" />
-                      </button>
+                          className="p-1.5 hover:bg-red-900/30 rounded-full transition-colors ml-1"
+                          aria-label="Delete"
+                        >
+                          <TrashIcon className="h-5 w-5 text-red-400" />
+                        </button>
                     </div>
                   </div>
                 </div>

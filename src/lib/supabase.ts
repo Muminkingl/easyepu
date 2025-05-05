@@ -2154,12 +2154,12 @@ export async function deletePresentationSection(
         .from('presentation_group_members')
         .delete()
         .in('group_id', groupIds);
-        
+
       if (membersDeleteError) {
         console.error('Error deleting group members:', membersDeleteError);
         return false;
       }
-      
+
       // 2. Then delete all the groups themselves
       const { error: groupsDeleteError } = await supabase
         .from('presentation_groups')
