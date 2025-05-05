@@ -328,9 +328,44 @@ export async function updatePhoneNumber(clerkId: string, phoneNumber: string): P
       return false;
     }
 
+    // Safety check for parameters
+    if (!phoneNumber || typeof phoneNumber !== 'string') {
+      console.error('Invalid phone number parameter');
+      return false;
+    }
+    
+    if (!clerkId || typeof clerkId !== 'string') {
+      console.error('Invalid clerkId parameter');
+      return false;
+    }
+    
+    // More thorough sanitization - keep only digits
+    const sanitizedPhoneNumber = phoneNumber.replace(/\D/g, '');
+    
+    // Handle various phone formats
+    let finalPhoneNumber = sanitizedPhoneNumber;
+    
+    // If number starts with 964 (country code for Iraq), remove it
+    if (sanitizedPhoneNumber.startsWith('964')) {
+      finalPhoneNumber = '0' + sanitizedPhoneNumber.substring(3);
+    } 
+    // If number doesn't start with 0, add it
+    else if (!sanitizedPhoneNumber.startsWith('0') && sanitizedPhoneNumber.length > 0) {
+      finalPhoneNumber = '0' + sanitizedPhoneNumber;
+    }
+    
+    // Ensure it starts with 07
+    if (finalPhoneNumber.length > 0 && !finalPhoneNumber.startsWith('07')) {
+      if (finalPhoneNumber.startsWith('0')) {
+        finalPhoneNumber = '07' + finalPhoneNumber.substring(1);
+      } else {
+        finalPhoneNumber = '07' + finalPhoneNumber;
+      }
+    }
+    
     // Validate Iraq phone number format (starts with 07 and has 11 digits)
     const phoneRegex = /^07\d{9}$/;
-    if (!phoneRegex.test(phoneNumber)) {
+    if (!phoneRegex.test(finalPhoneNumber)) {
       console.error('Invalid phone number format. Must start with 07 and have 11 digits total.');
       return false;
     }
@@ -338,22 +373,16 @@ export async function updatePhoneNumber(clerkId: string, phoneNumber: string): P
     const { error } = await supabase
       .from('users')
       .update({
-        phone_number: phoneNumber,
+        phone_number: finalPhoneNumber,
         updated_at: new Date().toISOString(),
       })
       .eq('clerk_id', clerkId);
 
     if (error) {
-      console.error('Supabase update error details:', {
-        message: error.message,
-        code: error.code,
-        details: error.details,
-        hint: error.hint
-      });
+      console.error('Supabase update error:', error.message);
       return false;
     }
 
-    console.log('Phone number updated successfully');
     return true;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);

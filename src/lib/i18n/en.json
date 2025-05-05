@@ -230,22 +230,30 @@
     "noteDesc": "Your profile information is synchronized with your EPU account. If you need to update your personal information, please contact the university administration.",
     "contactInfo": {
       "title": "Contact Information",
-      "description": "Update your contact details",
-      "updatePhoneNumber": "Update Phone Number",
-      "adminWarning": "ONLY ADMINS CAN SEE YOUR NUMBER (AMIR AND MUMIN) NO ONE ELSE CAN SEE IT",
-      "success": "Phone number successfully updated!",
+      "description": "Update your contact information",
       "phoneNumber": "Phone Number",
-      "phoneNumberFormat": "Please enter your phone number in the format: 07XXXXXXXXX",
+      "updatePhoneNumber": "Update Phone Number",
+      "phoneNumberFormat": "Format: 07XXXXXXXXX (Iraqi mobile number)",
+      "phoneNumberError": "Phone number must be in the format 07XXXXXXXXX (11 digits starting with 07)",
+      "phoneNumberTooShort": "Phone number is too short",
+      "phoneNumberTooLong": "Phone number is too long",
+      "genericError": "An error occurred while updating your number. Please try again",
+      "notAuthenticated": "Please login to update your information",
+      "updateFailed": "Failed to update phone number on the server",
+      "updateLocalFailed": "Phone number updated on server but failed to update locally",
+      "adminWarning": "For administrative purposes only",
+      "adminNote": "Your phone number is used by administrators for urgent communication only and is never shared with third parties.",
       "updating": "Updating...",
       "updatedSuccessfully": "Updated Successfully",
-      "updatePhoneNumber": "Update Phone Number",
-      "adminNote": "This phone number will be used by administration for important communications."
+      "success": "Phone number updated successfully"
     },
     "genderInfo": {
       "title": "Gender Information",
       "description": "Set your gender identification",
+      "updateFailed": "Failed to update gender on the server",
+      "updateLocalFailed": "Gender updated on server but failed to update locally",
       "cannotBeChanged": "Gender Cannot Be Changed",
-      "oneTimeSelection": "For data integrity reasons, gender can only be set once."
+      "oneTimeSelection": "For data integrity and survey accuracy, gender cannot be changed once set."
     },
     "groupInfo": {
       "title": "Group Selection",

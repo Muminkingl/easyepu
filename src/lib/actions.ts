@@ -62,6 +62,23 @@ import {
  */
 export async function updateUserPhoneNumber(userId: string, phoneNumber: string): Promise<boolean> {
   try {
+    // Safety checks for parameters
+    if (!userId || typeof userId !== 'string') {
+      console.error('SERVER ACTION: Invalid userId');
+      return false;
+    }
+    
+    if (!phoneNumber || typeof phoneNumber !== 'string') {
+      console.error('SERVER ACTION: Invalid phone number');
+      return false;
+    }
+    
+    if (phoneNumber.length < 8) {
+      console.error('SERVER ACTION: Phone number too short');
+      return false;
+    }
+    
+    // Call the database function with the correct parameters
     return await updatePhoneNumber(userId, phoneNumber);
   } catch (error) {
     console.error('Error in updateUserPhoneNumber action:', error);

@@ -16,7 +16,7 @@ interface GenderFormProps {
 
 export default function GenderForm({ userId, initialGender, onUpdate, onSuccess }: GenderFormProps) {
   const { user } = useUser();
-  const { userData, updateGender } = useUserData();
+  const { userData, updateUserGender } = useUserData();
   const { t, dir } = useTranslations();
   const [gender, setGender] = useState(initialGender || userData?.gender || 'male');
   const [loading, setLoading] = useState(false);
@@ -64,12 +64,16 @@ export default function GenderForm({ userId, initialGender, onUpdate, onSuccess 
       const effectiveUserId = userId || user?.id || '';
       
       // First update in the database via server action
-      await updateUserGender(effectiveUserId, gender);
+      const actionResult = await updateUserGender(effectiveUserId, gender);
       
-      // Then update the local state via the hook
-      const success = await updateGender(gender);
-      if (!success) {
-        throw new Error('Failed to update local state');
+      // Check if server action failed
+      if (!actionResult) {
+        throw new Error(t('profile.genderInfo.updateFailed') || 'Failed to update gender on the server');
+      }
+      
+      // Now update local state by using the hook's function
+      if (typeof updateUserGender === 'function') {
+        await updateUserGender(gender);
       }
       
       setSuccess(true);
@@ -88,6 +92,7 @@ export default function GenderForm({ userId, initialGender, onUpdate, onSuccess 
     } catch (err) {
       console.error('Error updating gender:', err);
       setError(err instanceof Error ? err.message : 'Failed to update gender');
+      setSuccess(false);
     } finally {
       setLoading(false);
     }
