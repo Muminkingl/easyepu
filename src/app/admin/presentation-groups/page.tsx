@@ -370,7 +370,7 @@ export default function PresentationGroupsAdminPage() {
                       <div className="p-3 border-t border-indigo-700/20">
                         {group.notes && (
                           <div className="mb-3 p-2 bg-indigo-700/20 rounded text-indigo-200 text-sm">
-                            <strong>Notes:</strong> {group.notes}
+                            <strong>Topic:</strong> {group.notes}
                           </div>
                         )}
                         
@@ -455,8 +455,8 @@ export default function PresentationGroupsAdminPage() {
         // Prepare data for this section
         const sheetData = [];
         
-        // Add header row
-        sheetData.push(['Group ID', 'Group Name', 'Student Name', 'Student Email', 'Group Class', 'Is Creator', 'Group Notes']);
+        // Add header row - MODIFIED to just include Group Name, Student Name, and Topic
+        sheetData.push(['Group Name', 'Student Name', 'Topic']);
         
         // For each group in this section
         for (const group of groups) {
@@ -464,28 +464,10 @@ export default function PresentationGroupsAdminPage() {
           
           // For each member in the group
           for (const member of members) {
-            // Get user data for members that have user_id (registered users)
-            let groupClass = 'N/A';
-            
-            if (member.user_id) {
-              try {
-                const userDataResult = await getUserDataAction(member.user_id);
-                if (userDataResult) {
-                  groupClass = userDataResult.group_class || 'N/A';
-                }
-              } catch (error) {
-                console.error(`Error fetching user data for ${member.user_id}:`, error);
-              }
-            }
-            
             sheetData.push([
-              group.id,
               group.name || `Group ${group.id}`,
               member.name,
-              member.email || 'N/A',
-              groupClass,
-              member.is_creator ? 'Yes' : 'No',
-              group.notes || 'N/A'
+              group.notes || 'N/A'  // Topic is stored in the notes field
             ]);
           }
         }
@@ -493,15 +475,11 @@ export default function PresentationGroupsAdminPage() {
         // Create a new worksheet with the data
         const ws = XLSX.utils.aoa_to_sheet(sheetData);
         
-        // Set column widths for better readability
+        // Set column widths for better readability - MODIFIED for new columns
         ws['!cols'] = [
-          { wch: 10 },  // Group ID
-          { wch: 25 },  // Group Name
+          { wch: 20 },  // Group Name
           { wch: 25 },  // Student Name
-          { wch: 30 },  // Student Email
-          { wch: 15 },  // Group Class
-          { wch: 10 },  // Is Creator
-          { wch: 40 }   // Group Notes
+          { wch: 40 }   // Topic
         ];
         
         // Add the worksheet to the workbook

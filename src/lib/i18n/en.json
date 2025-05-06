@@ -419,7 +419,15 @@
     "creator": "Creator",
     "profileRequired": "Complete your profile",
     "profileRequiredMessage": "You must set your gender and group class in your profile before creating a group.",
-    "updateProfile": "Update Profile"
+    "updateProfile": "Update Profile",
+    "topic": "Presentation Topic",
+    "topicPlaceholder": "Enter your presentation topic...",
+    "topicRequired": "Topic (Required)",
+    "addTopic": "Add Topic",
+    "editTopic": "Edit Topic",
+    "saveTopic": "Save Topic",
+    "topicDescription": "The topic or subject of your presentation",
+    "topicCannotBeEmpty": "Presentation topic cannot be empty"
   },
   "username": {
     "title": "Username",

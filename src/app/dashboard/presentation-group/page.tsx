@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useUser } from '@clerk/nextjs';
 import { useUserData } from '@/hooks/useUserData';
 import { motion } from 'framer-motion';
@@ -36,6 +36,16 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useTranslations } from '@/lib/i18n';
+import { supabase } from '@/lib/supabase';
+
+type Group = {
+  id: string | number;
+  name: string;
+  created_at: string;
+  members: string[];
+  creator: string;
+  topic?: string;
+};
 
 export default function PresentationGroupPage() {
   const { isLoaded, isSignedIn, user } = useUser();
@@ -64,6 +74,9 @@ export default function PresentationGroupPage() {
   const [editingMembers, setEditingMembers] = useState(false);
   const [membersList, setMembersList] = useState<{ id?: number; name: string }[]>([]);
   const [isUpdatingMembers, setIsUpdatingMembers] = useState(false);
+  const [editingTopic, setEditingTopic] = useState<string | null>(null);
+  const [topicText, setTopicText] = useState('');
+  const [groupTopic, setGroupTopic] = useState('');
 
   useEffect(() => {
     setMounted(true);
@@ -185,6 +198,13 @@ export default function PresentationGroupPage() {
       return;
     }
 
+    // Validate topic field
+    if (!groupTopic.trim()) {
+      setErrorMessage(t('presentationGroupPage.topicCannotBeEmpty'));
+      setIsSubmitting(false);
+      return;
+    }
+
     // Validate form
     if (members.some(m => !m.name.trim())) {
       setErrorMessage('All member names are required');
@@ -196,12 +216,13 @@ export default function PresentationGroupPage() {
       // Filter out empty members
       const validMembers = members.filter(m => m.name.trim());
       
-      // Group name and notes are no longer needed - they'll be handled automatically by the backend
+      // Group name will be auto-generated with G1, G2, etc. format by the backend
+      // Pass the topic in the notes field
       const groupId = await createPresentationGroupAction(
         user.id,
         selectedSection.id,
         null, // name will be auto-generated
-        null, // no notes
+        groupTopic.trim(), // use the topic field as notes
         validMembers.map(m => ({ name: m.name })) // only include name for members
       );
 
@@ -217,6 +238,7 @@ export default function PresentationGroupPage() {
         // Reset form
         setShowJoinForm(false);
         setGroupName('');
+        setGroupTopic('');
         setNotes('');
         setMembers([{ name: '' }]);
         // Load the group members
@@ -274,33 +296,39 @@ export default function PresentationGroupPage() {
       return;
     }
 
+    // Validate that the topic is not empty
+    if (!editGroupNotes.trim()) {
+      setErrorMessage(t('presentationGroupPage.topicCannotBeEmpty'));
+      return;
+    }
+
     setIsUpdating(true);
     setErrorMessage('');
     setSuccessMessage('');
 
     try {
-      // Only allow editing notes, not the group name (group name is auto-generated)
+      // Only allow editing notes (topic), not the group name (group name is auto-generated)
       const success = await updatePresentationGroupAction(
         user.id,
         editingGroupId,
         {
           name: null, // Don't update name
-          notes: editGroupNotes.trim() || null
+          notes: editGroupNotes.trim() // The notes field is used for the topic
         }
       );
 
       if (success) {
-        setSuccessMessage('Group details updated successfully!');
+        setSuccessMessage('Group topic updated successfully!');
         // Reload groups to reflect changes
         await loadSections();
         // Exit edit mode
         setEditingGroupId(null);
       } else {
-        setErrorMessage('Failed to update group. You may not have permission.');
+        setErrorMessage('Failed to update group topic. You may not have permission.');
       }
     } catch (error) {
       console.error('Error updating group:', error);
-      setErrorMessage('An error occurred while updating the group');
+      setErrorMessage('An error occurred while updating the group topic');
     } finally {
       setIsUpdating(false);
     }
@@ -440,6 +468,122 @@ export default function PresentationGroupPage() {
         >
           {t('presentationGroupPage.updateProfile')}
         </Link>
+      </div>
+    );
+  };
+
+  const createGroup = async (existingGroups: Group[], userId: string) => {
+    try {
+      if (!supabase) {
+        console.error('Supabase client is not initialized');
+        return null;
+      }
+      
+      const { data: newGroup, error: createError } = await supabase
+        .from('presentation_groups')
+        .insert([
+          {
+            name: `G${existingGroups.length + 1}`,
+            members: [userId],
+            creator: userId,
+            topic: '',
+          },
+        ])
+        .select()
+        .single();
+
+      if (createError) throw createError;
+      return newGroup;
+    } catch (error) {
+      console.error('Error creating group:', error);
+      return null;
+    }
+  };
+
+  const ExistingGroups = ({ groups, t }: { groups: Group[]; t: (key: string) => string }) => {
+    const { user } = useUser();
+    
+    // Filter groups to only show the current user's groups
+    const userGroups = groups.filter(group => 
+      group.members.includes(user?.id || '') || group.creator === user?.id
+    );
+
+    const updateTopic = async (groupId: string, newTopic: string) => {
+      try {
+        if (!supabase) {
+          console.error('Supabase client is not initialized');
+          return false;
+        }
+        
+        const { error } = await supabase
+          .from('presentation_groups')
+          .update({ topic: newTopic })
+          .eq('id', groupId);
+
+        if (error) throw error;
+        setEditingTopic(null);
+      } catch (error) {
+        console.error('Error updating topic:', error);
+      }
+    };
+
+    return (
+      <div className="space-y-4">
+        <h2 className="text-xl font-semibold mb-4">{t('presentationGroupPage.existingGroups')}</h2>
+        {userGroups.map((group) => (
+          <div key={group.id} className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow">
+            <div className="flex justify-between items-start mb-4">
+              <h3 className="text-lg font-medium">{group.name}</h3>
+              {group.creator === user?.id && (
+                <button
+                  onClick={() => {
+                    setEditingTopic(String(group.id));
+                    setTopicText(group.topic || '');
+                  }}
+                  className="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400"
+                >
+                  {t('common.edit')}
+                </button>
+              )}
+            </div>
+            
+            {editingTopic === group.id ? (
+              <div className="mb-4">
+                <input
+                  type="text"
+                  value={topicText}
+                  onChange={(e) => setTopicText(e.target.value)}
+                  placeholder={t('presentationGroupPage.topicPlaceholder')}
+                  className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
+                />
+                <div className="mt-2 space-x-2">
+                  <button
+                    onClick={() => updateTopic(String(group.id), topicText)}
+                    className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
+                  >
+                    {t('common.save')}
+                  </button>
+                  <button
+                    onClick={() => setEditingTopic(null)}
+                    className="px-3 py-1 text-sm bg-gray-200 dark:bg-gray-600 rounded hover:bg-gray-300"
+                  >
+                    {t('common.cancel')}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="text-sm text-gray-600 dark:text-gray-300 mb-4">
+                <span className="font-medium">{t('presentationGroupPage.topic')}:</span>{' '}
+                {group.topic || t('presentationGroupPage.topicOptional')}
+              </div>
+            )}
+
+            <div className="mt-4">
+              <h4 className="text-sm font-medium mb-2">{t('presentationGroupPage.members')}:</h4>
+              // ... existing members list code ...
+            </div>
+          </div>
+        ))}
       </div>
     );
   };
@@ -619,7 +763,7 @@ export default function PresentationGroupPage() {
                   onClick={addMember}
                   className="mt-3 px-3 py-2 bg-indigo-700/50 text-indigo-200 rounded-lg hover:bg-indigo-600/50 transition-colors flex items-center text-sm"
                 >
-                  <UserPlus className="h-4 w-4 mr-2" />
+                  <PlusCircle className="h-4 w-4 mr-2" />
                   {t('presentationGroupPage.addMember')}
                 </button>
               )}
@@ -656,6 +800,67 @@ export default function PresentationGroupPage() {
             </div>
           </div>
         ) : null}
+        
+        {/* Group Topic Section */}
+        <div className="mb-4 bg-indigo-800/30 rounded-lg border border-indigo-700/30 p-4">
+          <div className="flex justify-between items-center mb-2">
+            <h4 className="text-md font-medium text-indigo-100">{t('presentationGroupPage.topic')}</h4>
+            {!editingGroupId && (
+              <button
+                onClick={() => setEditingGroupId(Number(currentGroup.id))}
+                className="px-3 py-1 bg-indigo-600/60 hover:bg-indigo-500/60 text-white rounded flex items-center text-sm"
+              >
+                <Edit className="h-3 w-3 mr-1" />
+                {t('presentationGroupPage.editTopic')}
+              </button>
+            )}
+          </div>
+          
+          {editingGroupId === Number(currentGroup.id) ? (
+            <div>
+              <textarea
+                value={editGroupNotes}
+                onChange={(e) => setEditGroupNotes(e.target.value)}
+                placeholder={t('presentationGroupPage.topicPlaceholder')}
+                rows={3}
+                required
+                className="w-full px-3 py-2 bg-indigo-700/30 border border-indigo-600/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-indigo-100 mb-2"
+              />
+              {errorMessage && errorMessage.includes('topic') && (
+                <p className="text-red-400 text-sm mb-2">{t('presentationGroupPage.topicCannotBeEmpty')}</p>
+              )}
+              <div className="flex space-x-2">
+                <button
+                  onClick={() => {
+                    if (!editGroupNotes.trim()) {
+                      setErrorMessage(t('presentationGroupPage.topicCannotBeEmpty'));
+                      return;
+                    }
+                    saveGroupChanges();
+                  }}
+                  className="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded flex items-center text-sm"
+                >
+                  <Save className="h-3 w-3 mr-1" />
+                  {t('presentationGroupPage.saveTopic')}
+                </button>
+                <button
+                  onClick={cancelEditing}
+                  className="px-3 py-1 bg-gray-600/60 hover:bg-gray-500/80 text-white rounded text-sm"
+                >
+                  {t('presentationGroupPage.cancel')}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="p-3 bg-indigo-700/20 rounded-lg text-indigo-200 text-sm">
+              {currentGroup.notes ? (
+                currentGroup.notes
+              ) : (
+                <span className="text-indigo-400">{t('presentationGroupPage.topicRequired')}</span>
+              )}
+            </div>
+          )}
+        </div>
         
         {/* Group Details */}
         {!isEditing && !editingMembers && currentGroup && (
@@ -853,6 +1058,22 @@ export default function PresentationGroupPage() {
                       <form onSubmit={handleCreateGroup} className="bg-indigo-800/30 rounded-lg border border-indigo-700/30 p-4">
                         <h3 className="text-lg font-medium text-indigo-100 mb-4">{t('presentationGroupPage.createNewGroup')}</h3>
 
+                        {/* Topic field - moved to the top for prominence */}
+                        <div className="mb-5">
+                          <label className="block text-sm font-medium text-indigo-200 mb-1">
+                            {t('presentationGroupPage.topic')} <span className="text-red-400">*</span>
+                          </label>
+                          <textarea
+                            value={groupTopic}
+                            onChange={(e) => setGroupTopic(e.target.value)}
+                            placeholder={t('presentationGroupPage.topicPlaceholder')}
+                            rows={3}
+                            required
+                            className="w-full px-3 py-2 bg-indigo-700/30 border border-indigo-600/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-indigo-100"
+                          />
+                          <p className="mt-1 text-xs text-indigo-400">{t('presentationGroupPage.topicDescription')}</p>
+                        </div>
+
                         <div className="mb-4">
                           <div className="flex justify-between items-center mb-2">
                             <label className="block text-sm font-medium text-indigo-200">
@@ -947,79 +1168,96 @@ export default function PresentationGroupPage() {
               )}
 
               {/* Other Groups in this Section */}
-              {groups.has(selectedSection.id) && groups.get(selectedSection.id)!.length > 0 && (
+              {groups.has(selectedSection.id) && (
                 <div>
                   <h3 className="text-lg font-medium text-indigo-100 mb-3">
                     {t('presentationGroupPage.existingGroups').replace('{section}', selectedSection.title)}
                   </h3>
                   <div className="space-y-3">
-                    {groups.get(selectedSection.id)!.map((group) => (
-                      <div 
-                        key={group.id} 
-                        className="bg-indigo-800/30 rounded-lg border border-indigo-700/30 overflow-hidden"
-                      >
-                        <button
-                          onClick={() => toggleGroupExpand(group.id)}
-                          className="w-full px-4 py-3 flex justify-between items-center text-left hover:bg-indigo-700/30 transition-colors"
+                    {groups.get(selectedSection.id)!
+                      // Filter to only show the user's group in this section
+                      .filter(group => myGroups.has(selectedSection.id) && group.id === myGroups.get(selectedSection.id))
+                      .map((group) => (
+                        <div 
+                          key={group.id} 
+                          className="bg-indigo-800/30 rounded-lg border border-indigo-700/30 overflow-hidden"
                         >
-                          <div>
-                            <span className="font-medium text-indigo-100">
-                              {group.name || `Group ${group.id}`}
-                            </span>
-                            <div className="text-xs text-indigo-300">
-                              {t('presentationGroupPage.createdAt').replace('{date}', new Date(group.created_at).toLocaleDateString())}
+                          <button
+                            onClick={() => toggleGroupExpand(group.id)}
+                            className="w-full px-4 py-3 flex justify-between items-center text-left hover:bg-indigo-700/30 transition-colors"
+                          >
+                            <div>
+                              <span className="font-medium text-indigo-100">
+                                {group.name || `Group ${group.id}`}
+                              </span>
+                              <div className="text-xs text-indigo-300">
+                                {t('presentationGroupPage.createdAt').replace('{date}', new Date(group.created_at).toLocaleDateString())}
+                              </div>
                             </div>
-                          </div>
-                          {expandedGroup === group.id ? (
-                            <ChevronUp className="h-5 w-5 text-indigo-300" />
-                          ) : (
-                            <ChevronDown className="h-5 w-5 text-indigo-300" />
-                          )}
-                        </button>
-                        
-                        {expandedGroup === group.id && (
-                          <div className="p-4 border-t border-indigo-700/30">
-                            {group.notes && (
-                              <div className="mb-3 p-3 bg-indigo-700/20 rounded-lg text-indigo-200 text-sm">
-                                {group.notes}
-                              </div>
-                            )}
-                            
-                            <h4 className="text-sm font-medium text-indigo-200 mb-2">{t('presentationGroupPage.members')}</h4>
-                            {groupMembers.has(group.id) ? (
-                              <ul className="space-y-2">
-                                {groupMembers.get(group.id)!.map((member) => (
-                                  <li 
-                                    key={member.id} 
-                                    className="flex items-center p-2 rounded bg-indigo-700/20"
-                                  >
-                                    <div className="w-6 h-6 rounded-full bg-indigo-600 flex items-center justify-center mr-2">
-                                      <span className="text-white font-medium text-xs">
-                                        {member.name.charAt(0).toUpperCase()}
-                                      </span>
-                                    </div>
-                                    <div className="text-sm">
-                                      <span className="font-medium text-indigo-100">
-                                        {member.name}
-                                        {member.is_creator && (
-                                          <span className="ml-2 text-xs bg-indigo-600/50 text-indigo-200 px-1.5 py-0.5 rounded-full">
-                                            {t('presentationGroupPage.creator')}
-                                          </span>
-                                        )}
-                                      </span>
-                                    </div>
-                                  </li>
-                                ))}
-                              </ul>
+                            {expandedGroup === group.id ? (
+                              <ChevronUp className="h-5 w-5 text-indigo-300" />
                             ) : (
-                              <div className="flex justify-center items-center h-16">
-                                <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-indigo-500"></div>
-                              </div>
+                              <ChevronDown className="h-5 w-5 text-indigo-300" />
                             )}
-                          </div>
-                        )}
-                      </div>
-                    ))}
+                          </button>
+                          
+                          {expandedGroup === group.id && (
+                            <div className="p-4 border-t border-indigo-700/30">
+                              {/* Add topic field here */}
+                              <div className="mb-3">
+                                <h4 className="text-sm font-medium text-indigo-200 mb-2">{t('presentationGroupPage.topic')}</h4>
+                                {editingGroupId === group.id ? (
+                                  <div className="mb-4">
+                                    <textarea
+                                      value={editGroupNotes}
+                                      onChange={(e) => setEditGroupNotes(e.target.value)}
+                                      placeholder={t('presentationGroupPage.topicPlaceholder')}
+                                      rows={2}
+                                      className="w-full px-3 py-2 bg-indigo-700/30 border border-indigo-600/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-indigo-100"
+                                    />
+                                  </div>
+                                ) : (
+                                  <div className="p-3 bg-indigo-700/20 rounded-lg text-indigo-200 text-sm">
+                                    {group.notes || t('presentationGroupPage.topicRequired')}
+                                  </div>
+                                )}
+                              </div>
+                              
+                              <h4 className="text-sm font-medium text-indigo-200 mb-2">{t('presentationGroupPage.members')}</h4>
+                              {groupMembers.has(group.id) ? (
+                                <ul className="space-y-2">
+                                  {groupMembers.get(group.id)!.map((member) => (
+                                    <li 
+                                      key={member.id} 
+                                      className="flex items-center p-2 rounded bg-indigo-700/20"
+                                    >
+                                      <div className="w-6 h-6 rounded-full bg-indigo-600 flex items-center justify-center mr-2">
+                                        <span className="text-white font-medium text-xs">
+                                          {member.name.charAt(0).toUpperCase()}
+                                        </span>
+                                      </div>
+                                      <div className="text-sm">
+                                        <span className="font-medium text-indigo-100">
+                                          {member.name}
+                                          {member.is_creator && (
+                                            <span className="ml-2 text-xs bg-indigo-600/50 text-indigo-200 px-1.5 py-0.5 rounded-full">
+                                              {t('presentationGroupPage.creator')}
+                                            </span>
+                                          )}
+                                        </span>
+                                      </div>
+                                    </li>
+                                  ))}
+                                </ul>
+                              ) : (
+                                <div className="flex justify-center items-center h-16">
+                                  <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-indigo-500"></div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      ))}
                   </div>
                 </div>
               )}
