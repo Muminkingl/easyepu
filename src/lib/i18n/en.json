@@ -251,9 +251,7 @@
       "title": "Gender Information",
       "description": "Set your gender identification",
       "updateFailed": "Failed to update gender on the server",
-      "updateLocalFailed": "Gender updated on server but failed to update locally",
-      "cannotBeChanged": "Gender Cannot Be Changed",
-      "oneTimeSelection": "For data integrity and survey accuracy, gender cannot be changed once set."
+      "updateLocalFailed": "Gender updated on server but failed to update locally"
     },
     "groupInfo": {
       "title": "Group Selection",

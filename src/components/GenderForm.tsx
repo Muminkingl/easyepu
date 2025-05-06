@@ -115,12 +115,6 @@ export default function GenderForm({ userId, initialGender, onUpdate, onSuccess 
             <div className="bg-red-800/50 p-3 rounded-full border-2 border-red-500/50 mb-3">
               <LockIcon className="h-8 w-8 text-red-300" />
             </div>
-            <p className={`text-lg font-bold text-white ${dir === 'rtl' ? 'text-center' : ''}`}>
-              {t('profile.genderInfo.cannotBeChanged')}
-            </p>
-            <p className={`text-indigo-300 text-center mt-2 max-w-xs ${dir === 'rtl' ? 'text-center' : ''}`}>
-              {t('profile.genderInfo.oneTimeSelection')}
-            </p>
           </div>
         )}
         
@@ -240,7 +234,6 @@ export default function GenderForm({ userId, initialGender, onUpdate, onSuccess 
             {isLocked ? (
               <div className="flex items-center">
                 <LockIcon className={`h-5 w-5 ${dir === 'rtl' ? 'ml-3' : 'mr-2'}`} />
-                <span>{t('poll.inactive')}</span>
               </div>
             ) : loading ? (
               <div className="flex items-center">
