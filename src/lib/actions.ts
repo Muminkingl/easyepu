@@ -1,5 +1,7 @@
 'use server';
 
+import { supabase } from './supabase';
+
 import { 
   updatePhoneNumber, 
   updateGender, 
@@ -53,6 +55,13 @@ import {
   getCourseById,
   getPollByAnnouncementId
 } from './supabase';
+
+import { 
+  uploadPresentationFile, 
+  updateGroupPresentationFile, 
+  getGroupPresentationFile,
+  deletePresentationFile
+} from './storage';
 
 /**
  * Updates a user's phone number in the database
@@ -650,7 +659,16 @@ export async function createPresentationGroupAction(
   members: { name: string; email?: string | null }[] = []
 ): Promise<number | null> {
   try {
-    return await createPresentationGroup(userId, sectionId, groupName, notes, members);
+    // First check if the user is already in a group for this section
+    const existingGroupId = await getUserPresentationGroupAction(userId, sectionId);
+    if (existingGroupId) {
+      console.log(`User ${userId} is already in group ${existingGroupId} for section ${sectionId}`);
+      return existingGroupId; // Return the existing group ID instead of creating a new one
+    }
+    
+    // If not in a group already, create a new one
+    const result = await createPresentationGroup(userId, sectionId, groupName, notes, members);
+    return result;
   } catch (error) {
     console.error('Error in createPresentationGroupAction:', error);
     throw new Error('Failed to create presentation group');
@@ -818,5 +836,73 @@ export async function getPollResultsAction(pollId: string): Promise<PollResults 
   } catch (error) {
     console.error('Error in getPollResultsAction:', error);
     throw new Error('Failed to get poll results');
+  }
+}
+
+/**
+ * Function to upload a presentation file for a group
+ * @param userId The user ID (must be the group creator)
+ * @param groupId The group ID
+ * @param file The file to upload
+ * @returns A promise that resolves to the file URL if successful, or null if failed
+ */
+export async function uploadPresentationFileAction(
+  userId: string,
+  groupId: number,
+  file: File
+): Promise<string | null> {
+  try {
+    // Check if user is in the group and is the creator
+    const { data: membership, error: membershipError } = await supabase
+      .from('presentation_group_members')
+      .select('user_id, is_creator')
+      .eq('group_id', groupId)
+      .eq('user_id', userId)
+      .single();
+
+    if (membershipError) {
+      console.error('Error checking user membership:', membershipError);
+      return null;
+    }
+
+    if (!membership || !membership.is_creator) {
+      console.error('User is not the creator of this group');
+      return null;
+    }
+
+    // Upload the file to storage using our Firebase wrapper
+    const fileUrl = await uploadPresentationFile(file, groupId);
+    if (!fileUrl) {
+      return null;
+    }
+
+    // Update the group with the file URL
+    const success = await updateGroupPresentationFile(groupId, fileUrl, file.name);
+    if (!success) {
+      // If failed to update the group, try to delete the uploaded file
+      await deletePresentationFile(fileUrl);
+      return null;
+    }
+
+    return fileUrl;
+  } catch (error) {
+    console.error('Error in uploadPresentationFileAction:', error);
+    return null;
+  }
+}
+
+/**
+ * Function to get a presentation file for a group
+ * @param groupId The group ID
+ * @returns A promise that resolves to the file URL and name if successful, or null if failed
+ */
+export async function getGroupPresentationFileAction(
+  groupId: number
+): Promise<{ url: string; name: string } | null> {
+  try {
+    return await getGroupPresentationFile(groupId);
+  } catch (error) {
+    console.error('Error in getGroupPresentationFileAction:', error);
+    return null;
   }
 } 

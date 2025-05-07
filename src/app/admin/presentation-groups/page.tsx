@@ -10,7 +10,8 @@ import {
   updatePresentationSectionAction,
   getPresentationGroupsBySectionAction,
   getPresentationGroupMembersAction,
-  getUserDataAction
+  getUserDataAction,
+  getGroupPresentationFileAction
 } from "@/lib/actions";
 import type { 
   PresentationSection, 
@@ -28,7 +29,10 @@ import {
   XCircle,
   ChevronDown,
   ChevronUp,
-  User
+  User,
+  Download,
+  FileIcon,
+  Presentation
 } from "lucide-react";
 
 export default function PresentationGroupsAdminPage() {
@@ -53,6 +57,7 @@ export default function PresentationGroupsAdminPage() {
   const [isDownloading, setIsDownloading] = useState<boolean>(false);
   const [sectionDownloading, setSectionDownloading] = useState<number | null>(null);
   const [mounted, setMounted] = useState(false);
+  const [presentationFiles, setPresentationFiles] = useState<Map<number, { url: string; name: string }>>(new Map());
 
   // Update the useEffect hook to set mounted state
   useEffect(() => {
@@ -100,6 +105,23 @@ export default function PresentationGroupsAdminPage() {
     }
   };
 
+  // Load presentation file for a group
+  const loadPresentationFile = async (groupId: number) => {
+    try {
+      const fileData = await getGroupPresentationFileAction(groupId);
+      
+      if (fileData) {
+        setPresentationFiles(prev => {
+          const newMap = new Map(prev);
+          newMap.set(groupId, fileData);
+          return newMap;
+        });
+      }
+    } catch (error) {
+      console.error('Error loading presentation file:', error);
+    }
+  };
+
   // Toggle section expansion
   const toggleSectionExpand = async (sectionId: number) => {
     if (expandedSection === sectionId) {
@@ -123,6 +145,8 @@ export default function PresentationGroupsAdminPage() {
       if (!groupMembers.has(groupId)) {
         await loadGroupMembers(groupId);
       }
+      // Load presentation file - always reload to ensure we have the latest
+      await loadPresentationFile(groupId);
     }
   };
 
@@ -344,8 +368,8 @@ export default function PresentationGroupsAdminPage() {
               <div className="space-y-3">
                 {groups.map(group => (
                   <div 
-                    key={group.id} 
-                    className="bg-indigo-800/20 border border-indigo-700/20 rounded-md overflow-hidden"
+                    key={group.id}
+                    className="border border-indigo-700/30 rounded-lg mb-3 overflow-hidden"
                   >
                     <button
                       onClick={() => toggleGroupExpand(group.id)}
@@ -368,6 +392,55 @@ export default function PresentationGroupsAdminPage() {
                     
                     {expandedGroup === group.id && (
                       <div className="p-3 border-t border-indigo-700/20">
+                        {/* Presentation File Download Section */}
+                        {presentationFiles.has(group.id) ? (
+                          <div className="mb-4 p-3 bg-indigo-700/20 rounded-lg">
+                            <div className="flex flex-col">
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center">
+                                  <Presentation className="h-5 w-5 text-indigo-400 mr-2" />
+                                  <div className="font-medium text-indigo-100">PowerPoint Presentation</div>
+                                </div>
+                                <span className="text-xs bg-green-600/30 px-2 py-0.5 rounded text-green-300 flex items-center">
+                                  <CheckCircleIcon className="h-3 w-3 mr-1" />
+                                  Available
+                                </span>
+                              </div>
+                              
+                              <div className="flex items-center text-xs text-indigo-300 mb-3">
+                                <FileIcon className="h-4 w-4 mr-1 text-indigo-400 flex-shrink-0" />
+                                <span className="truncate max-w-xs">
+                                  {presentationFiles.get(group.id)?.name}
+                                </span>
+                                <span className="ml-auto">
+                                  {new Date(presentationFiles.get(group.id)?.url.split('/').pop()?.split('-')[0] || '').toLocaleDateString()}
+                                </span>
+                              </div>
+                              
+                              <button
+                                className="text-green-500 border-green-600/30 hover:bg-green-600/10 px-4 py-2 rounded-md"
+                                onClick={() => {
+                                  const fileData = presentationFiles.get(Number(group.id));
+                                  if (!fileData) {
+                                    return false;
+                                  }
+                                  handleDownloadFile(fileData.url, fileData.name);
+                                }}
+                              >
+                                <Download className="h-4 w-4 mr-2" />
+                                Download Presentation
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="mb-4 p-3 bg-indigo-700/10 rounded-lg">
+                            <div className="flex items-center text-indigo-300">
+                              <Presentation className="h-5 w-5 text-indigo-400 mr-2" />
+                              <span>No presentation file uploaded yet</span>
+                            </div>
+                          </div>
+                        )}
+                        
                         {group.notes && (
                           <div className="mb-3 p-2 bg-indigo-700/20 rounded text-indigo-200 text-sm">
                             <strong>Topic:</strong> {group.notes}
@@ -420,99 +493,106 @@ export default function PresentationGroupsAdminPage() {
 
   const downloadSectionGroupsAsExcel = async (section: PresentationSection) => {
     try {
+      // Set the section as downloading
       setSectionDownloading(section.id);
-      setSuccessMessage('');
-      setErrorMessage('');
       
-      // Create a workbook
-      const wb = XLSX.utils.book_new();
-      
-      // Get all groups for this section if not already loaded
+      // Make sure we have the groups for this section
       if (!sectionGroups.has(section.id)) {
         await loadGroupsForSection(section.id);
       }
       
       const groups = sectionGroups.get(section.id) || [];
       
-      // If no groups, create an empty sheet with a message
-      if (groups.length === 0) {
-        const defaultData = [
-          [`No Groups Available for ${section.title}`],
-          [''],
-          ['There are currently no groups in this presentation section.'],
-          ['Students need to create groups to see data here.']
-        ];
-        const ws = XLSX.utils.aoa_to_sheet(defaultData);
-        XLSX.utils.book_append_sheet(wb, ws, "No Data");
-      } else {
-        // Get members for each group if not already loaded
+      // Load members for all groups if not already loaded
         for (const group of groups) {
           if (!groupMembers.has(group.id)) {
             await loadGroupMembers(group.id);
           }
         }
         
-        // Prepare data for this section
-        const sheetData = [];
+      // Create workbook and sheet
+      const workbook = XLSX.utils.book_new();
+      const sheetData = [
+        // Header row
+        ['Group Name', 'Created By', 'Topic', 'Member Name', 'Member Email', 'Is Creator', 'Date Created']
+      ];
         
-        // Add header row - MODIFIED to just include Group Name, Student Name, and Topic
-        sheetData.push(['Group Name', 'Student Name', 'Topic']);
-        
-        // For each group in this section
+      // Add data rows
         for (const group of groups) {
           const members = groupMembers.get(group.id) || [];
           
-          // For each member in the group
-          for (const member of members) {
+        if (members.length === 0) {
+          // Add a row with just the group info if no members
+          sheetData.push([
+            group.name || `Group ${group.id}`,
+            group.created_by,
+            group.notes || '',
+            '',
+            '',
+            '',
+            new Date(group.created_at).toLocaleDateString()
+          ]);
+        } else {
+          // Add a row for each member
+          for (let i = 0; i < members.length; i++) {
+            const member = members[i];
+            if (i === 0) {
+              // First member row includes group info
             sheetData.push([
               group.name || `Group ${group.id}`,
+                group.created_by,
+                group.notes || '',
+                member.name,
+                member.email || '',
+                member.is_creator ? 'Yes' : 'No',
+                new Date(group.created_at).toLocaleDateString()
+              ]);
+            } else {
+              // Subsequent member rows
+              sheetData.push([
+                '',
+                '',
+                '',
               member.name,
-              group.notes || 'N/A'  // Topic is stored in the notes field
+                member.email || '',
+              member.is_creator ? 'Yes' : 'No',
+                ''
             ]);
+            }
+          }
           }
         }
         
-        // Create a new worksheet with the data
-        const ws = XLSX.utils.aoa_to_sheet(sheetData);
-        
-        // Set column widths for better readability - MODIFIED for new columns
-        ws['!cols'] = [
-          { wch: 20 },  // Group Name
-          { wch: 25 },  // Student Name
-          { wch: 40 }   // Topic
-        ];
-        
-        // Add the worksheet to the workbook
-        XLSX.utils.book_append_sheet(wb, ws, section.title.substring(0, 30)); // Limit sheet name length
-      }
+      // Create sheet and add to workbook
+      const worksheet = XLSX.utils.aoa_to_sheet(sheetData);
+      XLSX.utils.book_append_sheet(workbook, worksheet, `Section - ${section.title}`);
       
-      // Generate the Excel file
-      const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-      const excelData = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      // Generate and download the file
+      XLSX.writeFile(workbook, `${section.title.replace(/[^a-zA-Z0-9]/g, '_')}_groups.xlsx`);
       
-      // Create a download link and trigger it
-      const fileName = `${section.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_groups_${new Date().toISOString().split('T')[0]}.xlsx`;
-      const url = URL.createObjectURL(excelData);
-      
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = fileName;
-      document.body.appendChild(link);
-      link.click();
-      
-      // Clean up
-      setTimeout(() => {
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-      }, 100);
-      
-      setSuccessMessage(`Excel file downloaded for ${section.title}!`);
+      // Set success message
+      setSuccessMessage(`Downloaded data for ${groups.length} groups in ${section.title}`);
     } catch (error) {
       console.error('Error generating Excel file:', error);
-      setErrorMessage('Failed to generate Excel file: ' + (error.message || 'Unknown error'));
+      setErrorMessage('Failed to generate Excel file: ' + (error instanceof Error ? error.message : 'Unknown error'));
     } finally {
       setSectionDownloading(null);
     }
+  };
+
+  // Download presentation file
+  const downloadFile = (url: string, filename: string) => {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
+  const handleDownloadFile = (url: string, filename: string) => {
+    // Use the downloadFile utility function
+    downloadFile(url, filename);
   };
 
   // Replace the conditional rendering for loading with a check for mounted state

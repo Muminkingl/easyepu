@@ -18,6 +18,12 @@ const nextConfig = {
     },
     // Output as a static site - this helps with images in the public folder
     output: 'standalone',
+    // Increase the body size limit for server actions to 10MB
+    experimental: {
+      serverActions: {
+        bodySizeLimit: '10mb'
+      }
+    }
   };
   
   module.exports = nextConfig;

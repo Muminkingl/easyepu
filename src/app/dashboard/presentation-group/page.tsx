@@ -11,7 +11,9 @@ import {
   getPresentationGroupMembersAction,
   getUserPresentationGroupAction,
   updatePresentationGroupAction,
-  updatePresentationGroupMembersAction
+  updatePresentationGroupMembersAction,
+  uploadPresentationFileAction,
+  getGroupPresentationFileAction
 } from '@/lib/actions';
 import type { 
   PresentationSection, 
@@ -32,7 +34,10 @@ import {
   Edit,
   Save,
   UserPlus,
-  AlertTriangle
+  AlertTriangle,
+  Upload,
+  FileIcon,
+  Presentation
 } from 'lucide-react';
 import Link from 'next/link';
 import { useTranslations } from '@/lib/i18n';
@@ -77,6 +82,10 @@ export default function PresentationGroupPage() {
   const [editingTopic, setEditingTopic] = useState<string | null>(null);
   const [topicText, setTopicText] = useState('');
   const [groupTopic, setGroupTopic] = useState('');
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const [fileUploadError, setFileUploadError] = useState('');
+  const [fileUploadSuccess, setFileUploadSuccess] = useState('');
+  const [presentationFiles, setPresentationFiles] = useState<Map<number, { url: string; name: string }>>(new Map());
 
   useEffect(() => {
     setMounted(true);
@@ -97,21 +106,73 @@ export default function PresentationGroupPage() {
       // Load user's groups for each section
       if (user?.id) {
         const userGroupsMap = new Map<number, number>();
+        let foundGroups = false;
         
         for (const section of data) {
+          try {
           const groupId = await getUserPresentationGroupAction(user.id, section.id);
           if (groupId) {
             userGroupsMap.set(section.id, groupId);
+              foundGroups = true;
+              
+              // Load presentation file for this group
+              loadPresentationFile(groupId);
+              
+              // Also load group members
+              loadGroupMembers(groupId);
+            }
+          } catch (error) {
+            console.error(`Error loading user group for section ${section.id}:`, error);
           }
         }
         
         setMyGroups(userGroupsMap);
+        
+        // If we didn't find any groups through the normal method, try the fallback
+        // This happens sometimes due to RLS issues
+        if (!foundGroups && data.length > 0) {
+          console.log("Trying fallback method to determine group membership");
+          try {
+            const fallbackGroups = new Map<number, number>();
+            
+            // Load all groups for the first section and check if the user is a member of any
+            const firstSection = data[0];
+            const allGroups = await getPresentationGroupsBySectionAction(firstSection.id);
+            
+            for (const group of allGroups) {
+              const members = await getPresentationGroupMembersAction(Number(group.id));
+              for (const member of members) {
+                if (member.user_id === user.id) {
+                  console.log(`Found user in group ${group.id} by direct member check`);
+                  fallbackGroups.set(firstSection.id, Number(group.id));
+                  
+                  // Load presentation file for this group
+                  loadPresentationFile(Number(group.id));
+                  
+                  // Store members
+                  setGroupMembers(prev => new Map(prev).set(Number(group.id), members));
+                }
+              }
+            }
+            
+            if (fallbackGroups.size > 0) {
+              setMyGroups(fallbackGroups);
+            }
+          } catch (fallbackError) {
+            console.error("Fallback method failed:", fallbackError);
+          }
+        }
 
         // Load groups for each section
         const groupsMap = new Map<number, PresentationGroup[]>();
         for (const section of data) {
+          try {
           const sectionGroups = await getPresentationGroupsBySectionAction(section.id);
           groupsMap.set(section.id, sectionGroups);
+          } catch (error) {
+            console.error(`Error loading groups for section ${section.id}:`, error);
+            groupsMap.set(section.id, []);
+          }
         }
         setGroups(groupsMap);
       }
@@ -188,6 +249,13 @@ export default function PresentationGroupPage() {
     setSuccessMessage('');
     setErrorMessage('');
 
+    // Check if user is already in a group for this section
+    if (myGroups.has(selectedSection.id)) {
+      setErrorMessage('You are already in a group for this section.');
+      setIsSubmitting(false);
+      return;
+    }
+
     // Check if user has set their gender and group class
     if (!userData?.gender || !userData?.group_class) {
       setErrorMessage(
@@ -251,6 +319,11 @@ export default function PresentationGroupPage() {
       setErrorMessage('An error occurred while creating the group');
     } finally {
       setIsSubmitting(false);
+      
+      // Force a refresh of the sections and groups to ensure everything is up to date
+      if (user?.id) {
+        loadSections();
+      }
     }
   };
 
@@ -263,6 +336,8 @@ export default function PresentationGroupPage() {
       if (!groupMembers.has(groupId)) {
         loadGroupMembers(groupId);
       }
+      // Load presentation file
+      loadPresentationFile(groupId);
     }
   };
 
@@ -462,13 +537,13 @@ export default function PresentationGroupPage() {
         <p className="mb-3 text-sm">
           {t('presentationGroupPage.profileRequiredMessage')}
         </p>
-        <Link 
-          href="/dashboard/profile" 
+            <Link 
+              href="/dashboard/profile" 
           className="self-start px-4 py-2 bg-amber-800/50 hover:bg-amber-700/50 text-amber-100 rounded-lg transition-colors text-sm"
-        >
-          {t('presentationGroupPage.updateProfile')}
-        </Link>
-      </div>
+            >
+              {t('presentationGroupPage.updateProfile')}
+            </Link>
+          </div>
     );
   };
 
@@ -545,7 +620,7 @@ export default function PresentationGroupPage() {
                   {t('common.edit')}
                 </button>
               )}
-            </div>
+        </div>
             
             {editingTopic === group.id ? (
               <div className="mb-4">
@@ -584,6 +659,131 @@ export default function PresentationGroupPage() {
             </div>
           </div>
         ))}
+      </div>
+    );
+  };
+
+  // Add new function to load presentation file for a group
+  const loadPresentationFile = async (groupId: number) => {
+    try {
+      console.log(`Loading presentation file for group ${groupId}`);
+      const fileData = await getGroupPresentationFileAction(groupId);
+      
+      if (fileData) {
+        console.log(`File data loaded:`, fileData);
+        setPresentationFiles(prev => {
+          const newMap = new Map(prev);
+          newMap.set(groupId, fileData);
+          return newMap;
+        });
+      } else {
+        console.log(`No file data found for group ${groupId}`);
+      }
+    } catch (error) {
+      console.error('Error loading presentation file:', error);
+    }
+  };
+
+  // Enhanced handleFileUpload function with better error handling and file replacement
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>, groupId: number) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    
+    // Reset states
+    setFileUploadError('');
+    setFileUploadSuccess('');
+    
+    // Validate file size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      setFileUploadError(t('presentationGroupPage.fileTooBig'));
+      return;
+    }
+    
+    // Validate file type (only PowerPoint files)
+    const validTypes = [
+      'application/vnd.ms-powerpoint',
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+    ];
+    if (!validTypes.includes(file.type)) {
+      setFileUploadError(t('presentationGroupPage.invalidFileType'));
+      return;
+    }
+    
+    setUploadingFile(true);
+    
+    try {
+      if (!user?.id) {
+        throw new Error('User not authenticated');
+      }
+      
+      // Create FormData for the file upload
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('userId', user.id);
+      formData.append('groupId', groupId.toString());
+      
+      // Use the server-side endpoint to handle the upload
+      const response = await fetch('/api/upload-presentation', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        setFileUploadSuccess(t('presentationGroupPage.uploadSuccess'));
+        
+        // Immediately update the presentation file state for instant feedback
+        setPresentationFiles(prev => new Map(prev).set(groupId, { 
+          url: result.fileUrl, 
+          name: result.fileName 
+        }));
+        
+        // Reload sections to ensure database changes are reflected in the UI
+        if (user?.id) {
+          loadSections();
+        }
+      } else {
+        setFileUploadError(result.error || t('presentationGroupPage.uploadError'));
+      }
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      setFileUploadError(t('presentationGroupPage.uploadError'));
+    } finally {
+      setUploadingFile(false);
+      
+      // Clear the input field so the same file can be selected again
+      event.target.value = '';
+    }
+  };
+
+  // Modified file rendering to prevent downloads
+  const renderFileLink = (groupId: number) => {
+    const fileData = presentationFiles.get(groupId);
+    if (!fileData) return null;
+    
+    return (
+      <div className="mt-4 p-3 bg-indigo-900/30 rounded-lg border border-indigo-800/30">
+        <div className="flex justify-between items-start mb-2">
+          <h4 className="text-sm font-medium text-indigo-200">{t('presentationGroupPage.uploadedPresentation')}:</h4>
+          <div className="px-2 py-0.5 bg-green-600/30 rounded text-xs text-green-300 flex items-center">
+            <CheckCircle className="h-3 w-3 mr-1" />
+            {t('presentationGroupPage.saved')}
+          </div>
+        </div>
+        <div className="flex items-center">
+          <FileIcon className="h-5 w-5 mr-2 text-indigo-300 flex-shrink-0" />
+          <div className="text-indigo-300 text-sm truncate mr-2">
+            {fileData.name}
+          </div>
+          <span className="text-xs text-indigo-400 ml-auto">
+            {new Date(fileData.url.split('/').pop()?.split('-')[0] || '').toLocaleDateString()}
+          </span>
+        </div>
+        <div className="mt-2 text-xs text-amber-300 flex items-center">
+          <AlertTriangle className="h-3 w-3 mr-1" />
+          {t('presentationGroupPage.fileDownloadNotAllowed')}
+        </div>
       </div>
     );
   };
@@ -862,6 +1062,79 @@ export default function PresentationGroupPage() {
           )}
         </div>
         
+        {/* Presentation File Upload Section */}
+        {!isEditing && !editingMembers && currentGroup && (
+          <div className="mt-4 bg-indigo-800/30 rounded-lg border border-indigo-700/30 p-4">
+            <h3 className="font-medium text-indigo-100 text-lg mb-3 flex items-center">
+              <Presentation className="h-5 w-5 mr-2 text-indigo-400" />
+              {t('presentationGroupPage.presentation')}
+            </h3>
+            
+            {fileUploadError && (
+              <div className="mb-4 p-3 bg-red-900/30 border border-red-800/30 rounded-lg text-red-100 flex items-center">
+                <XCircle className="h-5 w-5 mr-2 text-red-400" />
+                {fileUploadError}
+              </div>
+            )}
+            
+            {fileUploadSuccess && (
+              <div className="mb-4 p-3 bg-green-900/30 border border-green-800/30 rounded-lg text-green-100 flex items-center">
+                <CheckCircle className="h-5 w-5 mr-2 text-green-400" />
+                {fileUploadSuccess}
+              </div>
+            )}
+            
+            {/* Current File Display */}
+            {presentationFiles.has(Number(currentGroup.id)) && (
+              <div className="mb-4">
+                {renderFileLink(Number(currentGroup.id))}
+              </div>
+            )}
+            
+            <div className="mb-3 p-3 bg-amber-800/30 text-amber-200 text-sm rounded-lg border border-amber-700/30">
+              {presentationFiles.has(Number(currentGroup.id))
+                ? t('presentationGroupPage.replaceNote')
+                : t('presentationGroupPage.presentationNote')}
+            </div>
+            
+            <label
+              htmlFor={`file-upload-${currentGroup.id}`}
+              className={`flex items-center justify-center p-4 border-2 border-dashed border-indigo-600/50 rounded-lg hover:bg-indigo-700/30 transition-colors cursor-pointer ${
+                uploadingFile ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
+            >
+              <div className="text-center">
+                <Upload className="mx-auto h-8 w-8 text-indigo-400 mb-2" />
+                <span className="font-medium text-indigo-200">
+                  {presentationFiles.has(Number(currentGroup.id))
+                    ? t('presentationGroupPage.replacePresentationFile')
+                    : t('presentationGroupPage.uploadPresentation')}
+                </span>
+                <p className="text-xs text-indigo-400 mt-1">
+                  PowerPoint files only (.ppt, .pptx), max 10MB
+                </p>
+                
+                {uploadingFile && (
+                  <div className="flex flex-col items-center mt-2">
+                    <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-indigo-500 mb-2"></div>
+                    <span className="text-sm text-indigo-300">
+                      {t('presentationGroupPage.uploadingPresentation')}
+                    </span>
+                  </div>
+                )}
+              </div>
+              <input
+                id={`file-upload-${currentGroup.id}`}
+                type="file"
+                accept=".ppt,.pptx,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation"
+                className="hidden"
+                onChange={(e) => handleFileUpload(e, Number(currentGroup.id))}
+                disabled={uploadingFile}
+              />
+            </label>
+          </div>
+        )}
+        
         {/* Group Details */}
         {!isEditing && !editingMembers && currentGroup && (
           <div className="bg-indigo-800/30 rounded-lg border border-indigo-700/30 overflow-hidden">
@@ -880,9 +1153,9 @@ export default function PresentationGroupPage() {
                 {t('presentationGroupPage.members')}
               </h4>
               
-              {groupMembers.has(groupId) ? (
+              {groupMembers.has(Number(currentGroup.id)) ? (
                 <ul className="space-y-2">
-                  {groupMembers.get(groupId)!.map((member) => (
+                  {groupMembers.get(Number(currentGroup.id))!.map((member) => (
                     <li 
                       key={member.id} 
                       className="flex items-center p-2 rounded bg-indigo-700/20"
@@ -1041,51 +1314,52 @@ export default function PresentationGroupPage() {
                       ) : (
                         <>
                           <PlusCircle className="h-5 w-5 mr-2" />
-                          {t('presentationGroupPage.createGroup')}
+                          {t('presentationGroupPage.createNewGroup')}
                         </>
                       )}
                     </button>
                   </div>
 
-                  {/* Group Form */}
+                  {/* Show form for creating a new group */}
                   {showJoinForm && (
                     <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
                       transition={{ duration: 0.3 }}
-                      className="mb-6 overflow-hidden"
+                      className="mb-6 bg-indigo-800/30 rounded-lg border border-indigo-700/30 p-4"
                     >
-                      <form onSubmit={handleCreateGroup} className="bg-indigo-800/30 rounded-lg border border-indigo-700/30 p-4">
-                        <h3 className="text-lg font-medium text-indigo-100 mb-4">{t('presentationGroupPage.createNewGroup')}</h3>
-
-                        {/* Topic field - moved to the top for prominence */}
-                        <div className="mb-5">
-                          <label className="block text-sm font-medium text-indigo-200 mb-1">
-                            {t('presentationGroupPage.topic')} <span className="text-red-400">*</span>
+                      {errorMessage && renderProfileRequiredError()}
+                      
+                      <form onSubmit={handleCreateGroup} className="space-y-4">
+                        <div>
+                          <label htmlFor="groupTopic" className="block text-sm font-medium text-indigo-200 mb-1">
+                            {t('presentationGroupPage.topic')}
+                            <span className="text-red-400 ml-1">*</span>
                           </label>
-                          <textarea
+                          <input
+                            id="groupTopic"
+                            type="text"
                             value={groupTopic}
-                            onChange={(e) => setGroupTopic(e.target.value)}
+                            onChange={e => setGroupTopic(e.target.value)}
                             placeholder={t('presentationGroupPage.topicPlaceholder')}
-                            rows={3}
+                            className="w-full px-3 py-2 bg-indigo-700/30 border border-indigo-600/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-indigo-100 placeholder-indigo-400/70"
                             required
-                            className="w-full px-3 py-2 bg-indigo-700/30 border border-indigo-600/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-indigo-100"
                           />
-                          <p className="mt-1 text-xs text-indigo-400">{t('presentationGroupPage.topicDescription')}</p>
+                          <p className="mt-1 text-xs text-indigo-400">
+                            {t('presentationGroupPage.topicDescription')}
+                          </p>
                         </div>
 
-                        <div className="mb-4">
-                          <div className="flex justify-between items-center mb-2">
-                            <label className="block text-sm font-medium text-indigo-200">
+                        <div>
+                          <h4 className="text-sm font-medium text-indigo-200 mb-2 flex items-center">
+                            <Users className="h-4 w-4 mr-2 text-indigo-400" />
                               {t('presentationGroupPage.groupMembers')}
-                            </label>
-                            <span className="text-xs text-indigo-300">
-                              {t('presentationGroupPage.membersCount')
-                                .replace('{current}', String(members.length + 1))
-                                .replace('{max}', String(selectedSection.max_members))}
-                            </span>
-                          </div>
+                          </h4>
+                          <p className="text-xs text-indigo-400 mb-3">
+                            {t('presentationGroupPage.membersCount').replace('{current}', String(members.length + 1)).replace('{max}', String(selectedSection.max_members))}
+                          </p>
 
+                          {/* Current user (creator) */}
                           <div className="p-3 bg-indigo-700/20 border border-indigo-700/30 rounded-lg mb-4">
                             <div className="flex items-center">
                               <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center mr-3">
@@ -1114,7 +1388,7 @@ export default function PresentationGroupPage() {
                                     value={member.name}
                                     onChange={(e) => handleMemberChange(index, 'name', e.target.value)}
                                     placeholder={t('presentationGroupPage.memberName')}
-                                    className="w-full px-3 py-2 bg-indigo-700/30 border border-indigo-600/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-indigo-100 placeholder-indigo-400/70 mb-2"
+                                    className="w-full px-3 py-2 bg-indigo-700/30 border border-indigo-600/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-indigo-100 placeholder-indigo-400/70"
                                     required
                                   />
                                 </div>
@@ -1141,14 +1415,15 @@ export default function PresentationGroupPage() {
                           )}
                         </div>
 
+                        <div>
                         <button
                           type="submit"
                           disabled={isSubmitting}
-                          className="w-full px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:hover:bg-indigo-600 flex items-center justify-center"
+                            className="w-full flex items-center justify-center px-4 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-colors disabled:opacity-50"
                         >
                           {isSubmitting ? (
                             <>
-                              <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                               </svg>
@@ -1156,111 +1431,108 @@ export default function PresentationGroupPage() {
                             </>
                           ) : (
                             <>
-                              <PlusCircle className="h-5 w-5 mr-2" />
+                                <UserGroup className="h-5 w-5 mr-2" />
                               {t('presentationGroupPage.createGroup')}
                             </>
                           )}
                         </button>
+                        </div>
                       </form>
                     </motion.div>
                   )}
                 </>
               )}
 
-              {/* Other Groups in this Section */}
-              {groups.has(selectedSection.id) && (
-                <div>
+              {/* List of existing groups */}
+              <div className="mb-4">
                   <h3 className="text-lg font-medium text-indigo-100 mb-3">
                     {t('presentationGroupPage.existingGroups').replace('{section}', selectedSection.title)}
                   </h3>
+                
+                {groups.has(selectedSection.id) && groups.get(selectedSection.id)!.length > 0 ? (
                   <div className="space-y-3">
                     {groups.get(selectedSection.id)!
-                      // Filter to only show the user's group in this section
+                      // Filter to only show the user's group
                       .filter(group => myGroups.has(selectedSection.id) && group.id === myGroups.get(selectedSection.id))
                       .map((group) => (
-                        <div 
-                          key={group.id} 
-                          className="bg-indigo-800/30 rounded-lg border border-indigo-700/30 overflow-hidden"
+                      <div key={group.id} className="bg-indigo-800/30 rounded-lg border border-indigo-700/30 overflow-hidden">
+                        <button
+                          onClick={() => toggleGroupExpand(Number(group.id))}
+                          className="w-full px-4 py-3 flex justify-between items-center hover:bg-indigo-700/20 transition-colors"
                         >
-                          <button
-                            onClick={() => toggleGroupExpand(group.id)}
-                            className="w-full px-4 py-3 flex justify-between items-center text-left hover:bg-indigo-700/30 transition-colors"
-                          >
-                            <div>
-                              <span className="font-medium text-indigo-100">
-                                {group.name || `Group ${group.id}`}
-                              </span>
-                              <div className="text-xs text-indigo-300">
-                                {t('presentationGroupPage.createdAt').replace('{date}', new Date(group.created_at).toLocaleDateString())}
-                              </div>
+                          <div className="flex items-center">
+                            <UserGroup className="h-5 w-5 mr-2 text-indigo-400" />
+                            <div className="text-left">
+                              <span className="font-medium text-indigo-100">{group.name || `Group ${group.id}`}</span>
+                            <div className="text-xs text-indigo-300">
+                              {t('presentationGroupPage.createdAt').replace('{date}', new Date(group.created_at).toLocaleDateString())}
                             </div>
-                            {expandedGroup === group.id ? (
-                              <ChevronUp className="h-5 w-5 text-indigo-300" />
-                            ) : (
-                              <ChevronDown className="h-5 w-5 text-indigo-300" />
-                            )}
-                          </button>
-                          
-                          {expandedGroup === group.id && (
-                            <div className="p-4 border-t border-indigo-700/30">
-                              {/* Add topic field here */}
-                              <div className="mb-3">
-                                <h4 className="text-sm font-medium text-indigo-200 mb-2">{t('presentationGroupPage.topic')}</h4>
-                                {editingGroupId === group.id ? (
-                                  <div className="mb-4">
-                                    <textarea
-                                      value={editGroupNotes}
-                                      onChange={(e) => setEditGroupNotes(e.target.value)}
-                                      placeholder={t('presentationGroupPage.topicPlaceholder')}
-                                      rows={2}
-                                      className="w-full px-3 py-2 bg-indigo-700/30 border border-indigo-600/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-indigo-100"
-                                    />
-                                  </div>
-                                ) : (
-                                  <div className="p-3 bg-indigo-700/20 rounded-lg text-indigo-200 text-sm">
-                                    {group.notes || t('presentationGroupPage.topicRequired')}
-                                  </div>
-                                )}
-                              </div>
-                              
-                              <h4 className="text-sm font-medium text-indigo-200 mb-2">{t('presentationGroupPage.members')}</h4>
-                              {groupMembers.has(group.id) ? (
-                                <ul className="space-y-2">
-                                  {groupMembers.get(group.id)!.map((member) => (
-                                    <li 
-                                      key={member.id} 
-                                      className="flex items-center p-2 rounded bg-indigo-700/20"
-                                    >
-                                      <div className="w-6 h-6 rounded-full bg-indigo-600 flex items-center justify-center mr-2">
-                                        <span className="text-white font-medium text-xs">
-                                          {member.name.charAt(0).toUpperCase()}
-                                        </span>
-                                      </div>
-                                      <div className="text-sm">
-                                        <span className="font-medium text-indigo-100">
-                                          {member.name}
-                                          {member.is_creator && (
-                                            <span className="ml-2 text-xs bg-indigo-600/50 text-indigo-200 px-1.5 py-0.5 rounded-full">
-                                              {t('presentationGroupPage.creator')}
-                                            </span>
-                                          )}
-                                        </span>
-                                      </div>
-                                    </li>
-                                  ))}
-                                </ul>
-                              ) : (
-                                <div className="flex justify-center items-center h-16">
-                                  <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-indigo-500"></div>
-                                </div>
-                              )}
-                            </div>
+                          </div>
+                          </div>
+                          {expandedGroup === Number(group.id) ? (
+                            <ChevronUp className="h-5 w-5 text-indigo-400" />
+                          ) : (
+                            <ChevronDown className="h-5 w-5 text-indigo-400" />
                           )}
-                        </div>
-                      ))}
+                        </button>
+                        
+                        {expandedGroup === Number(group.id) && (
+                          <div className="p-4 border-t border-indigo-700/30">
+                            {group.notes && (
+                              <div className="mb-3 p-3 bg-indigo-700/20 rounded-lg text-indigo-200 text-sm">
+                                {group.notes}
+                              </div>
+                            )}
+                            
+                            <h4 className="text-sm font-medium text-indigo-300 mt-3 mb-2">
+                              {t('presentationGroupPage.members')}
+                            </h4>
+                            
+                            {groupMembers.has(Number(group.id)) ? (
+                              <ul className="space-y-2">
+                                {groupMembers.get(Number(group.id))!.map((member) => (
+                                  <li 
+                                    key={member.id} 
+                                    className="flex items-center p-2 rounded bg-indigo-700/20"
+                                  >
+                                    <div className="w-6 h-6 rounded-full bg-indigo-600 flex items-center justify-center mr-2">
+                                      <span className="text-white font-medium text-xs">
+                                        {member.name.charAt(0).toUpperCase()}
+                                      </span>
+                                    </div>
+                                    <div className="text-sm">
+                                      <span className="font-medium text-indigo-100">
+                                        {member.name}
+                                        {member.is_creator && (
+                                          <span className="ml-2 text-xs bg-indigo-600/50 text-indigo-200 px-1.5 py-0.5 rounded-full">
+                                            {t('presentationGroupPage.creator')}
+                                          </span>
+                                        )}
+                                      </span>
+                                    </div>
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <div className="flex justify-center items-center h-16">
+                                <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-indigo-500"></div>
+                              </div>
+                            )}
+                            
+                            {/* Show presentation file if available */}
+                            {renderFileLink(Number(group.id))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
                   </div>
+                ) : (
+                  <div className="text-center p-8 bg-indigo-800/30 rounded-lg border border-indigo-700/30">
+                    <UserGroup className="h-10 w-10 text-indigo-500 mx-auto mb-3" />
+                    <p className="text-indigo-200">No groups have been created for this section yet.</p>
                 </div>
               )}
+              </div>
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center h-64 p-6 text-center">

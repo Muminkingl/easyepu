@@ -78,7 +78,7 @@ export default clerkMiddleware(async (auth, req) => {
   // Content Security Policy - make it more permissive while still maintaining security
   response.headers.set(
     'Content-Security-Policy',
-    `default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://clerk.epu.edu.iq https://*.clerk.accounts.dev; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: blob:; font-src 'self' data: https:; connect-src 'self' https://*.supabase.co https://*.clerk.accounts.dev https://clerk.epu.edu.iq wss://*.supabase.co; frame-src 'self' https://*.clerk.accounts.dev https://clerk.epu.edu.iq; object-src 'none'; base-uri 'self';`
+    `default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://clerk.epu.edu.iq https://*.clerk.accounts.dev; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: blob:; font-src 'self' data: https:; connect-src 'self' https://*.supabase.co https://*.clerk.accounts.dev https://clerk.epu.edu.iq wss://*.supabase.co https://*.firebase.googleapis.com https://*.firebasestorage.googleapis.com https://firebasestorage.googleapis.com https://*.googleapis.com; frame-src 'self' https://*.clerk.accounts.dev https://clerk.epu.edu.iq; object-src 'none'; base-uri 'self';`
   );
   
   // Additional security headers
