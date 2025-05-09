@@ -51,9 +51,9 @@ export async function POST(request: Request) {
       } catch (deleteError) {
         console.error('Error deleting previous file:', deleteError);
         // Continue with upload even if delete fails
+        }
       }
-    }
-    
+      
     // Upload file to Vercel Blob Storage using our helper function
     const fileUrl = await uploadPresentationFile(file, Number(groupId));
     
@@ -76,17 +76,17 @@ export async function POST(request: Request) {
         console.error('Failed to clean up file after database error:', cleanupError);
       }
       
-      return NextResponse.json(
-        { success: false, error: 'Failed to update database' },
-        { status: 500 }
-      );
-    }
-    
-    return NextResponse.json({
-      success: true,
+        return NextResponse.json(
+          { success: false, error: 'Failed to update database' },
+          { status: 500 }
+        );
+      }
+      
+      return NextResponse.json({
+        success: true,
       fileUrl: fileUrl,
-      fileName: file.name
-    });
+        fileName: file.name
+      });
     
   } catch (error) {
     console.error('Error in upload-presentation endpoint:', error);

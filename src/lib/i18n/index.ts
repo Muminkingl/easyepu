@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import enTranslations from './en.json';
 import kuTranslations from './ku.json';
+import { memberManagementTranslations } from './member-management';
 
 // Define available languages
 export const languages = {
@@ -106,4 +107,20 @@ export const useTranslations = () => {
     dir,
     languages
   };
+};
+
+// Merge all translations
+const translations: { [key: string]: { [key: string]: string } } = {
+  en: {
+    ...enTranslations,
+    ...memberManagementTranslations.en,
+  },
+  ar: {
+    ...arTranslations,
+    ...memberManagementTranslations.ar,
+  },
+  ku: {
+    ...kuTranslations,
+    ...memberManagementTranslations.ku,
+  },
 }; 

@@ -504,64 +504,42 @@ export default function PresentationGroupsAdminPage() {
       const groups = sectionGroups.get(section.id) || [];
       
       // Load members for all groups if not already loaded
-        for (const group of groups) {
-          if (!groupMembers.has(group.id)) {
-            await loadGroupMembers(group.id);
-          }
+      for (const group of groups) {
+        if (!groupMembers.has(group.id)) {
+          await loadGroupMembers(group.id);
         }
+      }
         
       // Create workbook and sheet
       const workbook = XLSX.utils.book_new();
       const sheetData = [
-        // Header row
-        ['Group Name', 'Created By', 'Topic', 'Member Name', 'Member Email', 'Is Creator', 'Date Created']
+        // Header row - simplified to 3 columns
+        ['Group Name', 'Name', 'Topic']
       ];
         
       // Add data rows
-        for (const group of groups) {
-          const members = groupMembers.get(group.id) || [];
-          
+      for (const group of groups) {
+        const members = groupMembers.get(group.id) || [];
+        
         if (members.length === 0) {
           // Add a row with just the group info if no members
           sheetData.push([
             group.name || `Group ${group.id}`,
-            group.created_by,
-            group.notes || '',
             '',
-            '',
-            '',
-            new Date(group.created_at).toLocaleDateString()
+            group.notes || ''
           ]);
         } else {
           // Add a row for each member
           for (let i = 0; i < members.length; i++) {
             const member = members[i];
-            if (i === 0) {
-              // First member row includes group info
             sheetData.push([
               group.name || `Group ${group.id}`,
-                group.created_by,
-                group.notes || '',
-                member.name,
-                member.email || '',
-                member.is_creator ? 'Yes' : 'No',
-                new Date(group.created_at).toLocaleDateString()
-              ]);
-            } else {
-              // Subsequent member rows
-              sheetData.push([
-                '',
-                '',
-                '',
               member.name,
-                member.email || '',
-              member.is_creator ? 'Yes' : 'No',
-                ''
+              group.notes || ''
             ]);
-            }
-          }
           }
         }
+      }
         
       // Create sheet and add to workbook
       const worksheet = XLSX.utils.aoa_to_sheet(sheetData);

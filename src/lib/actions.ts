@@ -662,8 +662,10 @@ export async function createPresentationGroupAction(
     // First check if the user is already in a group for this section
     const existingGroupId = await getUserPresentationGroupAction(userId, sectionId);
     if (existingGroupId) {
-      console.log(`User ${userId} is already in group ${existingGroupId} for section ${sectionId}`);
-      return existingGroupId; // Return the existing group ID instead of creating a new one
+      // We'll now return null instead of the existing ID to indicate "failure to create"
+      // This makes it clear to the UI that the user couldn't create a new group
+      // The UI should check for group membership separately before attempting creation
+      return null;
     }
     
     // If not in a group already, create a new one
@@ -804,7 +806,113 @@ export async function updatePresentationGroupMembersAction(
   members: { id?: number; name: string; email?: string | null }[]
 ): Promise<boolean> {
   try {
-    return await updatePresentationGroupMembers(userId, groupId, members);
+    // First check which section this group belongs to so we can enforce member limits
+    if (!supabase) {
+      console.error('Supabase client not initialized');
+      return false;
+    }
+    
+    // Get the section ID and max members limit
+    const { data: groupData, error: groupError } = await supabase
+      .from('presentation_groups')
+      .select('section_id')
+      .eq('id', groupId)
+      .single();
+      
+    if (groupError || !groupData) {
+      console.error('Error fetching group data:', groupError);
+      return false;
+    }
+    
+    const sectionId = groupData.section_id;
+    
+    const { data: sectionData, error: sectionError } = await supabase
+      .from('presentation_sections')
+      .select('max_members')
+      .eq('id', sectionId)
+      .single();
+      
+    if (sectionError || !sectionData) {
+      console.error('Error fetching section data:', sectionError);
+      return false;
+    }
+    
+    // Check if the member count exceeds the maximum allowed
+    // Remember that the creator counts as one member
+    if (members.length + 1 > sectionData.max_members) {
+      console.error(`Too many members. Maximum allowed is ${sectionData.max_members} (including creator)`);
+      return false;
+    }
+    
+    // Now update the members
+    const success = await updatePresentationGroupMembers(userId, groupId, members);
+
+    // If regular update failed, try a more direct approach using SQL
+    if (!success) {
+      console.log('Regular update failed, trying direct SQL update...');
+      
+      // First verify user is creator
+      const { data: membership, error: membershipError } = await supabase
+        .from('presentation_group_members')
+        .select('user_id, is_creator')
+        .eq('group_id', groupId)
+        .eq('user_id', userId)
+        .single();
+
+      if (membershipError || !membership || !membership.is_creator) {
+        console.error('Error verifying creator status for direct update');
+        return false;
+      }
+      
+      // Try updating each member directly through SQL
+      let allSucceeded = true;
+      
+      for (const member of members) {
+        if (member.id) {
+          // Try to update existing member using direct SQL
+          try {
+            const { data, error } = await supabase.rpc('direct_update_member', {
+              p_member_id: member.id,
+              p_name: member.name.trim(),
+              p_email: member.email || null
+            });
+            
+            if (error) {
+              console.error(`Direct SQL update failed for member ${member.id}:`, error);
+              allSucceeded = false;
+            } else {
+              console.log(`Direct SQL update succeeded for member ${member.id}`);
+            }
+          } catch (directUpdateError) {
+            console.error(`Exception in direct SQL update for member ${member.id}:`, directUpdateError);
+            allSucceeded = false;
+          }
+        } else {
+          // Try to insert new member using direct SQL
+          try {
+            const { data, error } = await supabase.rpc('direct_insert_member', {
+              p_group_id: groupId,
+              p_name: member.name.trim(),
+              p_email: member.email || null
+            });
+            
+            if (error) {
+              console.error(`Direct SQL insert failed for new member:`, error);
+              allSucceeded = false;
+            } else {
+              console.log(`Direct SQL insert succeeded for new member`);
+            }
+          } catch (directInsertError) {
+            console.error(`Exception in direct SQL insert for new member:`, directInsertError);
+            allSucceeded = false;
+          }
+        }
+      }
+      
+      return allSucceeded;
+    }
+    
+    return success;
   } catch (error) {
     console.error('Error in updatePresentationGroupMembersAction:', error);
     throw new Error('Failed to update presentation group members');

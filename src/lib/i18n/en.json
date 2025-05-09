@@ -414,6 +414,7 @@
     "existingGroups": "Existing Groups in {section}",
     "createdAt": "Created {date}",
     "members": "Members:",
+    "noMembers": "No members yet",
     "creator": "Creator",
     "profileRequired": "Complete your profile",
     "profileRequiredMessage": "You must set your gender and group class in your profile before creating a group.",

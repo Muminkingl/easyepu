@@ -12,7 +12,7 @@ export async function uploadPresentationFile(file: File, groupId: number): Promi
     // Generate a unique filename
     const timestamp = Date.now();
     const filename = `presentations/${groupId}/${timestamp}-${file.name}`;
-    
+
     // Upload to Vercel Blob
     const blob = await put(filename, file, {
       access: 'public',
@@ -43,7 +43,7 @@ export async function updateGroupPresentationFile(
       console.error('Supabase client is not initialized');
       return false;
     }
-    
+
     // First, check what fields exist in the database
     const { data: columnInfo, error: columnError } = await supabase
       .from('presentation_groups')
@@ -84,16 +84,16 @@ export async function updateGroupPresentationFile(
     // Second try: Standard update with both column types
     try {
       const { error: updateError } = await supabase
-        .from('presentation_groups')
-        .update({
-          presentation_file_url: fileUrl,
-          presentation_file_name: fileName,
+      .from('presentation_groups')
+      .update({
+        presentation_file_url: fileUrl,
+        presentation_file_name: fileName,
           file_url: fileUrl, 
           file_name: fileName,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', groupId);
-      
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', groupId);
+
       if (!updateError) {
         return true;
       } else {
@@ -112,7 +112,7 @@ export async function updateGroupPresentationFile(
       });
       
       if (!forceError && forceResult) {
-        return true;
+    return true;
       } else {
         console.error('Force update error:', forceError);
       }
@@ -141,7 +141,7 @@ export async function getGroupPresentationFile(
       console.error('Supabase client is not initialized');
       return null;
     }
-    
+
     // Try to use the direct query function first
     try {
       const { data: fileData, error: fileError } = await supabase.rpc('check_presentation_file', {
@@ -169,17 +169,17 @@ export async function getGroupPresentationFile(
     // Fallback to standard query
     try {
       // Try both possible column naming conventions
-      const { data, error } = await supabase
-        .from('presentation_groups')
+    const { data, error } = await supabase
+      .from('presentation_groups')
         .select('*')
-        .eq('id', groupId)
-        .single();
-      
-      if (error) {
+      .eq('id', groupId)
+      .single();
+
+    if (error) {
         console.error('Error fetching group data:', error);
-        return null;
-      }
-      
+      return null;
+    }
+
       // Check if we have file data in either column format
       if (data.file_url && data.file_name) {
         return {

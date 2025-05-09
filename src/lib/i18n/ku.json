@@ -415,6 +415,7 @@
     "existingGroups": "گرووپە بەردەستەکان لە {section}",
     "createdAt": "دروستکراوە لە {date}",
     "members": "ئەندامەکان:",
+    "noMembers": "هیچ ئەندامێک نییە",
     "creator": "دروستکەر",
     "profileRequired": "پڕۆفایلەکەت تەواو بکە",
     "profileRequiredMessage": "پێویستە ڕەگەز و گرووپی پۆلەکەت لە پرۆفایلەکەت دیاری بکەیت پێش دروستکردنی گرووپێک.",

@@ -732,7 +732,7 @@ export async function createCourse(
       return null;
     }
 
-    console.log('Creating course with creator ID:', createdBy);
+    // console.log('Creating course with creator ID:', createdBy);
 
     // Get user role first to check if admin
     const { data: userData, error: userError } = await supabase
@@ -2008,6 +2008,11 @@ export async function getPresentationGroupMembers(groupId: number): Promise<Pres
       return [];
     }
 
+    // Add a timestamp parameter to force cache bypass
+    const timestamp = new Date().getTime();
+    // console.log(`Getting fresh group members for group ${groupId} at timestamp ${timestamp}`);
+    
+    // Direct query with simpler approach
     const { data, error } = await supabase
       .from('presentation_group_members')
       .select('*')
@@ -2018,6 +2023,9 @@ export async function getPresentationGroupMembers(groupId: number): Promise<Pres
       console.error('Error fetching presentation group members:', error);
       return [];
     }
+    
+    // Log the results to see what we're getting
+    // console.log(`Retrieved ${data?.length || 0} members for group ${groupId}:`, data);
 
     return data || [];
   } catch (error) {
@@ -2035,36 +2043,45 @@ export async function getUserPresentationGroup(userId: string, sectionId: number
       return null;
     }
 
-    // First get groups in this section
-    const { data: groups, error: groupsError } = await supabase
-      .from('presentation_groups')
-      .select('id')
-      .eq('section_id', sectionId);
-
-    if (groupsError) {
-      console.error('Error fetching presentation groups:', groupsError);
-      return null;
-    }
-
-    if (!groups || groups.length === 0) {
-      return null;
-    }
-
-    // Now check if user is in any of these groups
-    const groupIds = groups.map(g => g.id);
+    // First check if user exists in any presentation_group_members
     const { data: membership, error: membershipError } = await supabase
       .from('presentation_group_members')
       .select('group_id')
-      .eq('user_id', userId)
-      .in('group_id', groupIds)
-      .single();
+      .eq('user_id', userId);
 
-    if (membershipError && membershipError.code !== 'PGRST116') { // PGRST116 is "not found" which is expected if not in group
+    if (membershipError) {
       console.error('Error checking user membership:', membershipError);
       return null;
     }
 
-    return membership?.group_id || null;
+    if (!membership || membership.length === 0) {
+      // User is not a member of any group
+      return null;
+    }
+
+    // Now check if any of these groups are in the specified section
+    const groupIds = membership.map(m => m.group_id);
+    
+    // This query was causing the issue - it used .single() which returns an error
+    // when multiple groups are found, or when no groups are found
+    const { data: groupsInSection, error: groupError } = await supabase
+      .from('presentation_groups')
+      .select('id')
+      .eq('section_id', sectionId)
+      .in('id', groupIds);
+
+    if (groupError) {
+      console.error('Error checking group section:', groupError);
+      return null;
+    }
+
+    // If we found any groups in this section, return the first one
+    if (groupsInSection && groupsInSection.length > 0) {
+      return groupsInSection[0].id;
+    }
+    
+    // User is not in any group for this section
+    return null;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     console.error('Error in getUserPresentationGroup:', errorMessage);
@@ -2243,13 +2260,159 @@ export async function updatePresentationGroup(
   }
 }
 
-// Function to update presentation group members
+// Add a new forceful deletion function right before updatePresentationGroupMembers
+export async function forcefullyDeleteGroupMembers(
+  groupId: number,
+  memberIdsToDelete: number[]
+): Promise<boolean> {
+  try {
+    // console.log(`Forcefully deleting members ${memberIdsToDelete.join(', ')} from group ${groupId}`);
+    
+    if (!supabase) {
+      console.warn('Supabase not configured: Missing environment variables.');
+      return false;
+    }
+    
+    if (memberIdsToDelete.length === 0) {
+      return true; // Nothing to delete
+    }
+    
+    // APPROACH 1: Try brute force individual deletes with multiple conditions
+    let deleteSuccess = true;
+    const failedIds = new Set<number>();
+    
+    for (const memberId of memberIdsToDelete) {
+      // Use multiple deletion attempts with different conditions
+      const { error } = await supabase
+        .from('presentation_group_members')
+        .delete()
+        .eq('id', memberId)
+        .eq('group_id', groupId)
+        .eq('is_creator', false);
+      
+      if (error) {
+        console.error(`Error deleting member ${memberId}:`, error);
+        failedIds.add(memberId);
+        deleteSuccess = false;
+      } else {
+        // console.log(`Successfully deleted member ${memberId}`);
+      }
+    }
+    
+    if (deleteSuccess) {
+      return true;
+    }
+    
+    // APPROACH 2: Try batch delete for failed members
+    if (failedIds.size > 0) {
+      const remainingIds = Array.from(failedIds);
+      // console.log(`Trying batch delete for ${remainingIds.length} failed members:`, remainingIds);
+      
+      const { error: batchError } = await supabase
+        .from('presentation_group_members')
+        .delete()
+        .in('id', remainingIds)
+        .eq('group_id', groupId)
+        .eq('is_creator', false);
+      
+      if (!batchError) {
+        // console.log('Batch delete successful');
+        return true;
+      }
+      
+      console.error('Batch delete failed:', batchError);
+    }
+    
+    // APPROACH 3: Try with a fresh Supabase client (bypass potential caching/session issues)
+    try {
+      const freshClient = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        {
+          auth: {
+            persistSession: false,
+            autoRefreshToken: false
+          }
+        }
+      );
+      
+      // console.log('Trying with fresh Supabase client');
+      
+      const { error: freshError } = await freshClient
+        .from('presentation_group_members')
+        .delete()
+        .in('id', memberIdsToDelete)
+        .eq('group_id', groupId)
+        .eq('is_creator', false);
+        
+      if (!freshError) {
+        // console.log('Fresh client delete successful');
+        return true;
+      }
+      
+      console.error('Fresh client delete failed:', freshError);
+    } catch (freshError) {
+      console.error('Error with fresh client:', freshError);
+    }
+    
+    // APPROACH 4: Try to use server API route (most powerful approach)
+    try {
+      // console.log('Calling server API route for deletion');
+      
+      const response = await fetch('/api/delete-members', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          groupId,
+          memberIds: memberIdsToDelete
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`API response not OK: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      // console.log('API deletion result:', result);
+      
+      return result.success;
+    } catch (apiError) {
+      console.error('Error calling delete API:', apiError);
+      
+      // Try one more time with just groupId (to delete all non-creator members)
+      try {
+        // console.log('Final attempt: API route with only groupId');
+        
+        const lastResponse = await fetch('/api/delete-members', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ groupId })
+        });
+        
+        const lastResult = await lastResponse.json();
+        return lastResult.success;
+      } catch (lastError) {
+        console.error('Final API attempt failed:', lastError);
+        return false;
+      }
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error('Error in forcefullyDeleteGroupMembers:', errorMessage);
+    return false;
+  }
+}
+
+// Update the existing updatePresentationGroupMembers function
 export async function updatePresentationGroupMembers(
   userId: string,
   groupId: number,
   members: { id?: number; name: string; email?: string | null }[]
 ): Promise<boolean> {
   try {
+    // Production code doesn't need console logs
+    // console.log('updatePresentationGroupMembers - Starting update with members:', members);
+    
     if (!supabase) {
       console.warn('Supabase not configured: Missing environment variables.');
       return false;
@@ -2273,89 +2436,263 @@ export async function updatePresentationGroupMembers(
       return false;
     }
 
-    // Get current members to identify which ones to remove
-    const { data: currentMembers, error: currentMembersError } = await supabase
+    // Get current non-creator members to compare with the new list
+    const { data: currentMembers, error: getMembersError } = await supabase
+      .from('presentation_group_members')
+      .select('id, name, email, is_creator')
+      .eq('group_id', groupId)
+      .eq('is_creator', false);
+      
+    if (getMembersError) {
+      console.error('Error fetching current members:', getMembersError);
+      return false;
+    }
+    
+    // console.log('Current members in database:', currentMembers);
+    
+    // Track which current members need to be kept, updated, or deleted
+    const currentMemberIds = new Set(currentMembers?.map(m => m.id) || []);
+    const keepMemberIds = new Set();
+    
+    // Create a mapping of current member IDs to their details for quick lookup
+    const currentMemberMap = new Map();
+    if (currentMembers) {
+      currentMembers.forEach(member => {
+        currentMemberMap.set(member.id, member);
+      });
+    }
+    
+    // SPECIAL CASE: If members array is empty, delete all non-creator members
+    if (members.length === 0 && currentMembers && currentMembers.length > 0) {
+      // console.log("SPECIAL CASE: Empty members list - deleting all non-creator members");
+      
+      // Get array of member IDs to delete
+      const memberIdsToDelete = currentMembers.map(m => m.id);
+      
+      // Use our forceful deletion function
+      const deleteSuccess = await forcefullyDeleteGroupMembers(groupId, memberIdsToDelete);
+      
+      // If that didn't work, try the direct API call approach
+      if (!deleteSuccess) {
+        // console.log("Forceful deletion failed, trying API route...");
+        
+        try {
+          // Call server-side API to perform deletion
+          const response = await fetch('/api/delete-members', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ groupId })
+          });
+          
+          const result = await response.json();
+          if (!result.success) {
+            console.error("Server API deletion failed:", result.error);
+            return false;
+          }
+        } catch (e) {
+          console.error("Error calling API:", e);
+          return false;
+        }
+      }
+      
+      // All delete operations completed (whether successful or not)
+      return true;
+    }
+    
+    // Handle updates and additions
+    for (const member of members) {
+      if (member.id && currentMemberIds.has(member.id)) {
+        // Update existing member - check if the data actually changed
+        keepMemberIds.add(member.id);
+        const currentMember = currentMemberMap.get(member.id);
+        
+        // Only update if name has actually changed
+        if (currentMember && (currentMember.name !== member.name.trim() || 
+            currentMember.email !== (member.email || null))) {
+          
+          // console.log(`Updating existing member ID ${member.id} from "${currentMember.name}" to "${member.name}"`);
+          
+          // Create the update object
+          const updateObject = {
+            name: member.name.trim(),
+            email: member.email || null
+          };
+          
+          // console.log(`Update object:`, updateObject);
+          
+          // Perform the update without .select()
+          const { error: updateError, status, statusText } = await supabase
+            .from('presentation_group_members')
+            .update(updateObject)
+            .eq('id', member.id);
+            
+          if (updateError) {
+            console.error(`Error updating member ${member.id}:`, updateError);
+            return false;
+          }
+          
+          // console.log(`Update status: ${status} ${statusText}`);
+          
+          // Verify the update immediately
+          const { data: verifyData } = await supabase
+            .from('presentation_group_members')
+            .select('id, name, email')
+            .eq('id', member.id)
+            .single();
+            
+          // console.log(`Verification after update for member ${member.id}:`, verifyData);
+          
+          // Check if the update was actually applied
+          if (verifyData && verifyData.name !== member.name.trim()) {
+            console.error(`Update verification failed: Name was not updated to "${member.name.trim()}", still "${verifyData.name}"`);
+            // Try one more time with a more direct update
+            const { error: retryError } = await supabase.rpc('update_member_name', {
+              member_id: member.id,
+              new_name: member.name.trim()
+            });
+            
+            if (retryError) {
+              console.error(`Retry update failed:`, retryError);
+            } else {
+              // console.log(`Retry update completed via RPC function`);
+            }
+          }
+        } else {
+          // console.log(`Member ${member.id} data unchanged, skipping update`);
+        }
+      } else {
+        // Add new member
+        // console.log(`Adding new member: ${member.name}`);
+        const { data: insertData, error: insertError } = await supabase
+          .from('presentation_group_members')
+          .insert({
+            group_id: groupId,
+            user_id: null, // External members
+            name: member.name.trim(),
+            email: member.email || null,
+            is_creator: false
+          });
+          
+        if (insertError) {
+          console.error('Error inserting new member:', insertError);
+          return false;
+        }
+        
+        // console.log('Insert completed successfully');
+      }
+    }
+    
+    // Delete members that weren't in the updated list
+    const membersToDelete = Array.from(currentMemberIds).filter(id => !keepMemberIds.has(id));
+    
+    if (membersToDelete.length > 0) {
+      // console.log(`Deleting ${membersToDelete.length} removed members:`, membersToDelete);
+      
+      // Use the forceful deletion function
+      const deleteSuccess = await forcefullyDeleteGroupMembers(groupId, membersToDelete);
+      
+      if (!deleteSuccess) {
+        console.error("Failed to delete some members");
+        return false;
+      }
+    }
+    
+    // Verify the changes by fetching the updated list
+    const { data: updatedMembers, error: verifyError } = await supabase
       .from('presentation_group_members')
       .select('id, name, email, is_creator')
       .eq('group_id', groupId);
-
-    if (currentMembersError) {
-      console.error('Error fetching current members:', currentMembersError);
-      return false;
-    }
-
-    // Find the creator member that shouldn't be modified
-    const creatorMember = currentMembers?.find(m => m.is_creator) || null;
-    if (!creatorMember) {
-      console.error('No creator found for this group');
-      return false;
-    }
-
-    // Filter out the creator from the list so we don't modify it
-    const nonCreatorMembers = currentMembers?.filter(m => !m.is_creator) || [];
-    
-    // Members to remove: members in DB that aren't in the new list
-    const memberIdsToKeep = members.map(m => m.id).filter(id => id !== undefined);
-    const membersToRemove = nonCreatorMembers.filter(m => !memberIdsToKeep.includes(m.id));
-    
-    // Members to update: members with IDs that exist in both lists
-    const membersToUpdate = members.filter(m => m.id !== undefined);
-    
-    // Members to add: members without IDs (new members)
-    const membersToAdd = members
-      .filter(m => !m.id)
-      .map(m => ({
-        group_id: groupId,
-        user_id: null, // External members
-        name: m.name,
-        email: m.email || null,
-        is_creator: false
-      }));
-
-    // Start a transaction to update the members
-    
-    // 1. Remove members that are not in the new list
-    if (membersToRemove.length > 0) {
-      const removeIds = membersToRemove.map(m => m.id);
-      const { error: removeError } = await supabase
-        .from('presentation_group_members')
-        .delete()
-        .in('id', removeIds);
-
-      if (removeError) {
-        console.error('Error removing members:', removeError);
-        return false;
+      
+    if (verifyError) {
+      console.error('Error verifying member updates:', verifyError);
+    } else {
+      // Filter for non-creator members for verification
+      const nonCreatorMembers = updatedMembers ? updatedMembers.filter(m => !m.is_creator) : [];
+      // console.log('Final non-creator members after updates:', nonCreatorMembers);
+      
+      // Check if any deletions failed
+      let deletionsFailed = false;
+      for (const idToDelete of membersToDelete) {
+        if (nonCreatorMembers.some(m => m.id === idToDelete)) {
+          console.error(`Deletion verification failed: Member ${idToDelete} still exists in the database`);
+          deletionsFailed = true;
+          
+          // Try emergency deletion for this specific member via our simple API endpoint
+          try {
+            // console.log(`Calling simple deletion endpoint for member ${idToDelete}`);
+            const response = await fetch('/api/force-delete-member', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ 
+                memberId: idToDelete,
+                groupId
+              })
+            });
+            
+            if (response.ok) {
+              const result = await response.json();
+              // console.log(`Simple deletion result for member ${idToDelete}:`, result);
+            } else {
+              console.error(`Simple deletion failed for member ${idToDelete}: ${response.status}`);
+              
+              // Fallback: Direct client-side deletion attempt as last resort
+              try {
+                // console.log(`Trying direct client-side deletion for member ${idToDelete}`);
+                
+                // Try several approaches
+                const { error: directDeleteError } = await supabase
+                  .from('presentation_group_members')
+                  .delete()
+                  .eq('id', idToDelete);
+                  
+                if (directDeleteError) {
+                  console.error(`Direct client delete failed:`, directDeleteError);
+                } else {
+                  // console.log(`Direct client delete might have succeeded`);
+                }
+              } catch (directError) {
+                console.error(`Exception in direct client delete:`, directError);
+              }
+            }
+          } catch (apiError) {
+            console.error(`Exception calling simple deletion API for member ${idToDelete}:`, apiError);
+          }
+        }
+      }
+      
+      // If we've specified empty members and there are still non-creator members, that's a failure
+      if (members.length === 0 && nonCreatorMembers.length > 0) {
+        console.error(`Failed to delete all members when emptying list`);
+        
+        // Try a simpler approach to delete all members
+        try {
+          // console.log("Trying to delete all non-creator members directly");
+          
+          // Just loop through each member and try to delete them individually
+          for (const member of nonCreatorMembers) {
+            try {
+              await fetch('/api/force-delete-member', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                  memberId: member.id,
+                  groupId
+                })
+              });
+            } catch (e) {
+              console.error(`Failed to delete member ${member.id}:`, e);
+            }
+          }
+        } catch (e) {
+          console.error('Exception in direct member deletion:', e);
+        }
       }
     }
-
-    // 2. Update existing members
-    for (const member of membersToUpdate) {
-      const { error: updateError } = await supabase
-        .from('presentation_group_members')
-        .update({
-          name: member.name,
-          email: member.email || null
-        })
-        .eq('id', member.id);
-
-      if (updateError) {
-        console.error('Error updating member:', updateError);
-        return false;
-      }
-    }
-
-    // 3. Add new members
-    if (membersToAdd.length > 0) {
-      const { error: addError } = await supabase
-        .from('presentation_group_members')
-        .insert(membersToAdd);
-
-      if (addError) {
-        console.error('Error adding new members:', addError);
-        return false;
-      }
-    }
-
+    
+    // Add a delay to give database operations time to complete
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    // console.log('Member update completed successfully');
     return true;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);

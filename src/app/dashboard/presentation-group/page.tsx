@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useUser } from '@clerk/nextjs';
 import { useUserData } from '@/hooks/useUserData';
 import { motion } from 'framer-motion';
@@ -42,6 +42,9 @@ import {
 import Link from 'next/link';
 import { useTranslations } from '@/lib/i18n';
 import { supabase } from '@/lib/supabase';
+import { updateGroupMembers, forcePageRefresh, forceHardRefresh } from '@/lib/memberUpdates';
+import GroupMembersList from '@/components/GroupMembersList';
+import MemberEditor from '@/components/MemberEditor';
 
 type Group = {
   id: string | number;
@@ -56,6 +59,8 @@ export default function PresentationGroupPage() {
   const { isLoaded, isSignedIn, user } = useUser();
   const { userData, isLoading: userDataLoading } = useUserData();
   const { t } = useTranslations();
+  
+  // All useState hooks
   const [mounted, setMounted] = useState(false);
   const [sections, setSections] = useState<PresentationSection[]>([]);
   const [loading, setLoading] = useState(true);
@@ -86,9 +91,88 @@ export default function PresentationGroupPage() {
   const [fileUploadError, setFileUploadError] = useState('');
   const [fileUploadSuccess, setFileUploadSuccess] = useState('');
   const [presentationFiles, setPresentationFiles] = useState<Map<number, { url: string; name: string }>>(new Map());
+  // Add a refresh key to force re-renders
+  const [refreshKey, setRefreshKey] = useState(0);
 
+  // Near the top of the component, after all useState declarations
+  // Define functions before any hooks that use them
+  const loadGroupMembers = async (groupId: number) => {
+    try {
+      // Force cache invalidation by adding a timestamp parameter
+      const timestamp = new Date().getTime();
+      
+      // Fetch fresh data from the server
+      const members = await getPresentationGroupMembersAction(groupId);
+      
+      // Update the state with the fresh data
+      setGroupMembers(prev => {
+        const newMap = new Map(prev);
+        newMap.set(groupId, members);
+        return newMap;
+      });
+      
+      return members;
+    } catch (error) {
+      console.error('Error loading group members:', error);
+      return [];
+    }
+  };
+
+  // Define loadPresentationFile before any hooks use it
+  const loadPresentationFile = async (groupId: number) => {
+    try {
+      const fileData = await getGroupPresentationFileAction(groupId);
+      
+      if (fileData) {
+        setPresentationFiles(prev => {
+          const newMap = new Map(prev);
+          newMap.set(groupId, fileData);
+          return newMap;
+        });
+      }
+    } catch (error) {
+      console.error('Error loading presentation file:', error);
+    }
+  };
+
+  // Now all the useEffect hooks
   useEffect(() => {
     setMounted(true);
+    
+    // Check if there's a reload parameter in the URL, and if so, trigger a fresh data load
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      const reloadParam = url.searchParams.get('reload');
+      
+      if (reloadParam) {
+        // console.log('Detected reload parameter, forcing fresh data load:', reloadParam);
+        
+        // Clear URL parameters while preserving the path
+        window.history.replaceState({}, document.title, window.location.pathname);
+        
+        // Clear all cached data
+        setGroupMembers(new Map());
+        setGroups(new Map());
+        setMyGroups(new Map());
+        
+        // Try to clear browser cache headers
+        if ('caches' in window) {
+          try {
+            caches.keys().then(keys => {
+              keys.forEach(key => {
+                // console.log('Clearing cache:', key);
+                caches.delete(key);
+              });
+            });
+          } catch (e) {
+            console.error('Error clearing caches:', e);
+          }
+        }
+        
+        // Force a refresh key update to trigger all reactive effects
+        setRefreshKey(Date.now());
+      }
+    }
   }, []);
 
   useEffect(() => {
@@ -97,6 +181,97 @@ export default function PresentationGroupPage() {
     }
   }, [isLoaded, isSignedIn, user]);
 
+  useEffect(() => {
+    if (selectedSection && user?.id) {
+      // If a user has a group in this section, load its members
+      const groupId = myGroups.get(selectedSection.id);
+      if (groupId) {
+        loadGroupMembers(groupId);
+      }
+    }
+  }, [selectedSection, user, myGroups]);
+
+  useEffect(() => {
+    if (successMessage.includes('updated successfully') && selectedSection && user?.id) {
+      const groupId = myGroups.get(selectedSection.id);
+      if (groupId) {
+        // Force refresh to show latest changes
+        loadGroupMembers(groupId);
+      }
+    }
+  }, [successMessage, selectedSection, user, myGroups]);
+
+  useEffect(() => {
+    if (expandedGroup !== null) {
+      // Load group members if not already loaded
+      if (!groupMembers.has(expandedGroup)) {
+        loadGroupMembers(expandedGroup);
+      }
+      // Load presentation file
+      loadPresentationFile(expandedGroup);
+    }
+  }, [expandedGroup, groupMembers]);
+
+  // Add a new effect to reload data when refreshKey changes
+  useEffect(() => {
+    if (refreshKey > 0 && selectedSection && user?.id) {
+      // Get the current group ID for this section
+      const groupId = myGroups.get(selectedSection.id);
+      if (groupId) {
+        // console.log(`RefreshKey changed to ${refreshKey}, reloading members for group ${groupId}`);
+        // Force reload the members data
+        loadGroupMembers(groupId);
+      }
+    }
+  }, [refreshKey, selectedSection, user, myGroups]);
+
+  // Add effect to load members for the current group if they're not loaded yet
+  useEffect(() => {
+    if (selectedSection && user?.id && myGroups.has(selectedSection.id)) {
+      const groupId = myGroups.get(selectedSection.id)!;
+      
+      // Check if we have members loaded for this group
+      if (!groupMembers.has(groupId) || groupMembers.get(groupId)?.length === 0) {
+        // console.log(`Loading members for current group ${groupId}`);
+        loadGroupMembers(groupId).catch(e => console.error('Error loading members:', e));
+      }
+    }
+  }, [selectedSection, user, myGroups, groupMembers]);
+
+  // Add useEffect to force UI update whenever groupMembers changes
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      // For all groupMembers, update the UI elements directly
+      groupMembers.forEach((members, groupId) => {
+        members.forEach(member => {
+          // Find all matching elements by searching for member info
+          const elements = document.querySelectorAll(`[data-member-content="${member.name}"]`);
+          
+          // If we found elements, update them
+          elements.forEach(el => {
+            // Update name if needed - find any element with class member-name
+            const nameElements = document.querySelectorAll('.member-name');
+            nameElements.forEach(nameEl => {
+              if (nameEl.textContent !== member.name) {
+                nameEl.textContent = member.name;
+              }
+            });
+            
+            // Update avatar if needed - find any element with class member-avatar
+            const avatarElements = document.querySelectorAll('.member-avatar');
+            avatarElements.forEach(avatarEl => {
+              const firstChar = member.name.charAt(0).toUpperCase();
+              if (avatarEl.textContent !== firstChar) {
+                avatarEl.textContent = firstChar;
+              }
+            });
+          });
+        });
+      });
+    }
+  }, [groupMembers]);
+
+  // All regular function definitions below
   const loadSections = async () => {
     try {
       setRefreshing(true);
@@ -108,18 +283,22 @@ export default function PresentationGroupPage() {
         const userGroupsMap = new Map<number, number>();
         let foundGroups = false;
         
+        // Clear any old state first
+        setMyGroups(new Map());
+        
         for (const section of data) {
           try {
-          const groupId = await getUserPresentationGroupAction(user.id, section.id);
-          if (groupId) {
-            userGroupsMap.set(section.id, groupId);
+            const groupId = await getUserPresentationGroupAction(user.id, section.id);
+            
+            if (groupId) {
+              userGroupsMap.set(section.id, groupId);
               foundGroups = true;
               
               // Load presentation file for this group
               loadPresentationFile(groupId);
               
-              // Also load group members
-              loadGroupMembers(groupId);
+              // Don't directly call loadGroupMembers - the useEffect will handle this
+              // loadGroupMembers(groupId);
             }
           } catch (error) {
             console.error(`Error loading user group for section ${section.id}:`, error);
@@ -131,7 +310,6 @@ export default function PresentationGroupPage() {
         // If we didn't find any groups through the normal method, try the fallback
         // This happens sometimes due to RLS issues
         if (!foundGroups && data.length > 0) {
-          console.log("Trying fallback method to determine group membership");
           try {
             const fallbackGroups = new Map<number, number>();
             
@@ -143,7 +321,6 @@ export default function PresentationGroupPage() {
               const members = await getPresentationGroupMembersAction(Number(group.id));
               for (const member of members) {
                 if (member.user_id === user.id) {
-                  console.log(`Found user in group ${group.id} by direct member check`);
                   fallbackGroups.set(firstSection.id, Number(group.id));
                   
                   // Load presentation file for this group
@@ -156,7 +333,13 @@ export default function PresentationGroupPage() {
             }
             
             if (fallbackGroups.size > 0) {
-              setMyGroups(fallbackGroups);
+              setMyGroups(prev => {
+                const updated = new Map(prev);
+                fallbackGroups.forEach((groupId, sectionId) => {
+                  updated.set(sectionId, groupId);
+                });
+                return updated;
+              });
             }
           } catch (fallbackError) {
             console.error("Fallback method failed:", fallbackError);
@@ -167,8 +350,8 @@ export default function PresentationGroupPage() {
         const groupsMap = new Map<number, PresentationGroup[]>();
         for (const section of data) {
           try {
-          const sectionGroups = await getPresentationGroupsBySectionAction(section.id);
-          groupsMap.set(section.id, sectionGroups);
+            const sectionGroups = await getPresentationGroupsBySectionAction(section.id);
+            groupsMap.set(section.id, sectionGroups);
           } catch (error) {
             console.error(`Error loading groups for section ${section.id}:`, error);
             groupsMap.set(section.id, []);
@@ -186,15 +369,6 @@ export default function PresentationGroupPage() {
     }
   };
 
-  const loadGroupMembers = async (groupId: number) => {
-    try {
-      const members = await getPresentationGroupMembersAction(groupId);
-      setGroupMembers(prev => new Map(prev).set(groupId, members));
-    } catch (error) {
-      console.error('Error loading group members:', error);
-    }
-  };
-
   const handleSectionSelect = (section: PresentationSection) => {
     setSelectedSection(section);
     setShowJoinForm(false);
@@ -203,12 +377,6 @@ export default function PresentationGroupPage() {
     setMembers([{ name: '' }]);
     setSuccessMessage('');
     setErrorMessage('');
-    
-    // If user has a group in this section, load its members
-    const groupId = myGroups.get(section.id);
-    if (groupId && !groupMembers.has(groupId)) {
-      loadGroupMembers(groupId);
-    }
   };
 
   const handleToggleJoinForm = () => {
@@ -249,38 +417,44 @@ export default function PresentationGroupPage() {
     setSuccessMessage('');
     setErrorMessage('');
 
-    // Check if user is already in a group for this section
-    if (myGroups.has(selectedSection.id)) {
-      setErrorMessage('You are already in a group for this section.');
-      setIsSubmitting(false);
-      return;
-    }
-
-    // Check if user has set their gender and group class
-    if (!userData?.gender || !userData?.group_class) {
-      setErrorMessage(
-        'You must set your gender and group class in your profile before creating a group. ' +
-        'Please go to your profile page to update this information.'
-      );
-      setIsSubmitting(false);
-      return;
-    }
-
-    // Validate topic field
-    if (!groupTopic.trim()) {
-      setErrorMessage(t('presentationGroupPage.topicCannotBeEmpty'));
-      setIsSubmitting(false);
-      return;
-    }
-
-    // Validate form
-    if (members.some(m => !m.name.trim())) {
-      setErrorMessage('All member names are required');
-      setIsSubmitting(false);
-      return;
-    }
-
     try {
+      // Force a fresh check of user's group membership
+      const freshGroupId = await getUserPresentationGroupAction(user.id, selectedSection.id);
+      
+      // Update the local state with fresh data
+      if (freshGroupId) {
+        setMyGroups(new Map(myGroups).set(selectedSection.id, freshGroupId));
+        setErrorMessage('You are already in a group for this section.');
+        setIsSubmitting(false);
+        return;
+      }
+      
+      // Continue with normal form validation
+      
+      // Check if user has set their gender and group class
+      if (!userData?.gender || !userData?.group_class) {
+        setErrorMessage(
+          'You must set your gender and group class in your profile before creating a group. ' +
+          'Please go to your profile page to update this information.'
+        );
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Validate topic field
+      if (!groupTopic.trim()) {
+        setErrorMessage(t('presentationGroupPage.topicCannotBeEmpty'));
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Validate form
+      if (members.some(m => !m.name.trim())) {
+        setErrorMessage('All member names are required');
+        setIsSubmitting(false);
+        return;
+      }
+
       // Filter out empty members
       const validMembers = members.filter(m => m.name.trim());
       
@@ -332,12 +506,6 @@ export default function PresentationGroupPage() {
       setExpandedGroup(null);
     } else {
       setExpandedGroup(groupId);
-      // Load group members if not already loaded
-      if (!groupMembers.has(groupId)) {
-        loadGroupMembers(groupId);
-      }
-      // Load presentation file
-      loadPresentationFile(groupId);
     }
   };
 
@@ -409,8 +577,7 @@ export default function PresentationGroupPage() {
     }
   };
 
-  // Load group members for editing
-  const startEditingMembers = (groupId: number) => {
+  const startEditingMembers = async (groupId: number) => {
     // Check if user has set their gender and group class first
     if (!userData?.gender || !userData?.group_class) {
       setErrorMessage(
@@ -419,22 +586,42 @@ export default function PresentationGroupPage() {
       return;
     }
     
-    if (!groupMembers.has(groupId)) {
-      loadGroupMembers(groupId);
-    }
-    
-    const members = groupMembers.get(groupId) || [];
-    
-    // Filter out the creator and map to the format we need
-    const nonCreatorMembers = members
-      .filter(m => !m.is_creator)
-      .map(m => ({
-        id: m.id,
-        name: m.name
-      }));
-    
-    setMembersList(nonCreatorMembers);
+    // Set a loading state instead of directly calling function
     setEditingMembers(true);
+    
+    try {
+      // Force a fresh load of the group members to ensure we have the latest data
+      const freshMembers = await loadGroupMembers(groupId);
+      
+      // If no members were loaded or an error occurred, show an error
+      if (!freshMembers || freshMembers.length === 0) {
+        setErrorMessage('Failed to load group members. Please try again.');
+        setEditingMembers(false);
+        return;
+      }
+      
+      // Filter out the creator and map to the format we need
+      // IMPORTANT: Make sure to include the id property to update existing members rather than creating new ones
+      const nonCreatorMembers = freshMembers
+        .filter(m => !m.is_creator)
+        .map(m => ({
+          id: m.id, // This is critical for updates to work properly
+          name: m.name,
+          email: m.email || null
+        }));
+      
+      // console.log("Preparing to edit members with their original IDs:", 
+      //   nonCreatorMembers.map(m => ({ id: m.id, name: m.name }))
+      // );
+      
+      // Reset the members list completely
+      setMembersList(nonCreatorMembers);
+      
+    } catch (error) {
+      console.error('Error preparing to edit members:', error);
+      setErrorMessage('Failed to load group members. Please try again.');
+      setEditingMembers(false);
+    }
   };
 
   // Cancel editing members
@@ -448,8 +635,11 @@ export default function PresentationGroupPage() {
     if (!selectedSection) return;
     
     // Check if we've reached the max members limit
-    if (membersList.length >= selectedSection.max_members - 1) { // -1 for the creator
-      setErrorMessage(`Maximum ${selectedSection.max_members} members allowed (including you)`);
+    // Count existing members plus the creator (1)
+    const totalMemberCount = membersList.length + 1; // +1 for the creator
+    
+    if (totalMemberCount >= selectedSection.max_members) {
+      setErrorMessage(`Maximum ${selectedSection.max_members} members allowed (including you as creator)`);
       return;
     }
     
@@ -457,10 +647,57 @@ export default function PresentationGroupPage() {
   };
 
   // Remove a member from the edit list
-  const removeMember = (index: number) => {
+  const removeMember = async (index: number) => {
+    try {
+      const memberToRemove = membersList[index];
+      
+      // If this is an existing member (has an ID), use the force delete API
+      if (memberToRemove.id) {
+        // console.log(`Using force delete for member ${memberToRemove.id}`);
+        
+        const response = await fetch('/api/force-delete-member', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ memberId: memberToRemove.id })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          // console.log(`Successfully deleted member ${memberToRemove.id}`);
+          // Remove from the list after successful deletion
     const newMembersList = [...membersList];
     newMembersList.splice(index, 1);
     setMembersList(newMembersList);
+          
+          // Show quick success message
+          setSuccessMessage(`Member "${memberToRemove.name}" deleted successfully!`);
+          setTimeout(() => {
+            // Clear the success message after 3 seconds
+            if (successMessage.includes(memberToRemove.name)) {
+              setSuccessMessage('');
+            }
+          }, 3000);
+          
+          // Force refresh members display
+          if (selectedSection && myGroups.has(selectedSection.id)) {
+            const groupId = myGroups.get(selectedSection.id)!;
+            loadGroupMembers(groupId);
+          }
+        } else {
+          console.error(`Failed to delete member ${memberToRemove.id}:`, result.error);
+          setErrorMessage(`Failed to delete member "${memberToRemove.name}". Please try again.`);
+        }
+      } else {
+        // For new members that don't have IDs yet, just remove from the list
+        const newMembersList = [...membersList];
+        newMembersList.splice(index, 1);
+        setMembersList(newMembersList);
+      }
+    } catch (error) {
+      console.error('Error removing member:', error);
+      setErrorMessage('An error occurred while removing the member. Please try again.');
+    }
   };
 
   // Handle member field changes
@@ -482,11 +719,11 @@ export default function PresentationGroupPage() {
       return;
     }
     
-    const groupId = myGroups.get(selectedSection.id)!;
+    const currentGroupId = myGroups.get(selectedSection.id)!;
     
-    // Validate members
-    if (membersList.some(m => !m.name.trim())) {
-      setErrorMessage('All member names are required');
+    // Check max members limit one more time
+    if (membersList.length + 1 > selectedSection.max_members) { // +1 for creator
+      setErrorMessage(`Maximum ${selectedSection.max_members} members allowed (including you as creator)`);
       return;
     }
     
@@ -495,24 +732,107 @@ export default function PresentationGroupPage() {
     setSuccessMessage('');
     
     try {
-      const success = await updatePresentationGroupMembersAction(
-        user.id,
-        groupId,
-        membersList
-      );
+      // Log members being saved
+      // console.log(`Saving members for group ${currentGroupId}:`, 
+      //   membersList.map(m => ({ id: m.id || 'new', name: m.name }))
+      // );
       
-      if (success) {
-        setSuccessMessage('Group members updated successfully!');
-        // Reload the group members to reflect changes
-        await loadGroupMembers(groupId);
+      // Special case: If we're completely emptying the members list, try directly 
+      // using the API route first for more reliable deletion
+      if (membersList.length === 0) {
+        try {
+          setSuccessMessage("Removing all members...");
+          
+          const response = await fetch('/api/delete-members', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ groupId: currentGroupId })
+          });
+          
+          if (response.ok) {
+            const result = await response.json();
+            
+            if (result.success) {
+              // Successfully deleted all members
+              setEditingMembers(false);
+              setSuccessMessage("All members removed successfully!");
+              
+              // Clear cached data to force reload
+              setGroupMembers(new Map());
+              setRefreshKey(Date.now());
+              
+              // Force reload the members to confirm changes
+              loadGroupMembers(currentGroupId);
+              
+              setIsUpdatingMembers(false);
+              return;
+            }
+          }
+          
+          // If direct API call failed, continue with normal flow
+          // console.log("Direct API call failed, continuing with normal update flow");
+        } catch (apiError) {
+          console.error("Error in direct API call:", apiError);
+          // Continue with normal flow
+        }
+      }
+      
+      // Use direct call to supabase function to avoid RPC issues
+      // This bypasses the memberUpdates utility and goes straight to the source
+      if (!user.id) {
+        throw new Error('User ID is required');
+      }
+      
+      let result = false;
+      let attempts = 0;
+      const maxAttempts = 2;
+      
+      while (!result && attempts < maxAttempts) {
+        attempts++;
+        
+        if (attempts > 1) {
+          // console.log(`Retry attempt ${attempts} for updating members`);
+          setSuccessMessage(`Retrying... (attempt ${attempts})`);
+        }
+        
+        result = await import('@/lib/supabase').then(async (module) => {
+          return await module.updatePresentationGroupMembers(
+            user.id,
+            currentGroupId,
+            membersList
+          );
+        });
+        
+        if (!result && attempts < maxAttempts) {
+          // Wait a bit before retrying
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      }
+      
+      if (result) {
         // Exit editing mode
         setEditingMembers(false);
+        
+        // Show success message with refresh button option
+        setSuccessMessage(membersList.length === 0 
+          ? "All members removed successfully!" 
+          : "Group members updated successfully!");
+        
+        // Clear cached data to force reload
+        setGroupMembers(new Map());
+        
+        // Update the refresh key to trigger UI updates
+        setRefreshKey(Date.now());
+        
+        // Force reload the current group's members
+        loadGroupMembers(currentGroupId);
       } else {
-        setErrorMessage('Failed to update group members. You may not have permission.');
+        // If we still failed after retries, show error and offer manual refresh
+        setErrorMessage("Failed to update group members. Please try again or refresh the page.");
       }
     } catch (error) {
-      console.error('Error updating group members:', error);
-      setErrorMessage('An error occurred while updating the group members');
+      console.error('Error in saveMemberChanges:', error);
+      setErrorMessage('An error occurred while updating group members. Please try again.');
     } finally {
       setIsUpdatingMembers(false);
     }
@@ -663,27 +983,6 @@ export default function PresentationGroupPage() {
     );
   };
 
-  // Add new function to load presentation file for a group
-  const loadPresentationFile = async (groupId: number) => {
-    try {
-      console.log(`Loading presentation file for group ${groupId}`);
-      const fileData = await getGroupPresentationFileAction(groupId);
-      
-      if (fileData) {
-        console.log(`File data loaded:`, fileData);
-        setPresentationFiles(prev => {
-          const newMap = new Map(prev);
-          newMap.set(groupId, fileData);
-          return newMap;
-        });
-      } else {
-        console.log(`No file data found for group ${groupId}`);
-      }
-    } catch (error) {
-      console.error('Error loading presentation file:', error);
-    }
-  };
-
   // Enhanced handleFileUpload function with better error handling and file replacement
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>, groupId: number) => {
     const file = event.target.files?.[0];
@@ -740,9 +1039,9 @@ export default function PresentationGroupPage() {
         }));
         
         // Reload sections to ensure database changes are reflected in the UI
-        if (user?.id) {
-          loadSections();
-        }
+          if (user?.id) {
+            loadSections();
+          }
       } else {
         setFileUploadError(result.error || t('presentationGroupPage.uploadError'));
       }
@@ -788,6 +1087,73 @@ export default function PresentationGroupPage() {
     );
   };
 
+  // Add a function to manually update DOM elements with member names
+  // This is an extreme approach but works when React state isn't updating properly
+  const forceUpdateDomWithMemberNames = (groupId: number, membersList: { id?: number; name: string }[]) => {
+    // Only run on client side
+    if (typeof window === 'undefined') return;
+    
+    // Add a delay to ensure DOM is ready
+    setTimeout(() => {
+      try {
+        // console.log('Forcing DOM update for members:', membersList);
+        
+        // Create a map of ID to name for easy lookup
+        const memberNameMap = new Map<number | undefined, string>();
+        membersList.forEach(member => {
+          if (member.id) {
+            memberNameMap.set(member.id, member.name);
+          }
+        });
+        
+        // Find and update all member elements
+        const memberElements = document.querySelectorAll('[data-member-id]');
+        let updateCount = 0;
+        
+        memberElements.forEach(el => {
+          const memberId = el.getAttribute('data-member-id');
+          if (memberId) {
+            const id = parseInt(memberId);
+            if (memberNameMap.has(id)) {
+              const newName = memberNameMap.get(id);
+              // Find the span that contains the name
+              const nameSpan = el.querySelector('.member-name');
+              if (nameSpan instanceof HTMLElement && typeof newName === 'string' && nameSpan.textContent !== newName) {
+                nameSpan.textContent = newName;
+                // Also update the first letter in the avatar
+                const avatarSpan = el.querySelector('.member-avatar');
+                if (avatarSpan instanceof HTMLElement && newName) {
+                  avatarSpan.textContent = newName.charAt(0).toUpperCase();
+                }
+                updateCount++;
+              }
+            }
+          }
+        });
+        
+        // console.log(`DOM update completed: updated ${updateCount} member names`);
+      } catch (e) {
+        console.error('Error during manual DOM update:', e);
+      }
+    }, 1000);
+  };
+
+  // Function to deduplicate members by name
+  const getUniqueMembers = (members: PresentationGroupMember[]): PresentationGroupMember[] => {
+    // Create a Map to store unique members by ID
+    const uniqueMembers = new Map<number, PresentationGroupMember>();
+    
+    // Loop through members and add them to Map (which guarantees uniqueness by ID)
+    members.forEach(member => {
+      if (member.id) {
+        uniqueMembers.set(member.id, member);
+      }
+    });
+    
+    // Convert Map values back to array
+    return Array.from(uniqueMembers.values());
+  };
+
   if (!mounted || !isLoaded || userDataLoading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
@@ -808,6 +1174,10 @@ export default function PresentationGroupPage() {
   // Update the section where we show the user's current group
   // Add an edit button and edit form when in edit mode
   const renderUserGroup = () => {
+    // Include refreshKey in the dependency array to force re-rendering
+    // It's not actually used in the function, but will cause re-evaluation when it changes
+    // console.log('Rendering user group with refresh key:', refreshKey);
+    
     if (!selectedSection || !myGroups.has(selectedSection.id)) return null;
     
     const groupId = myGroups.get(selectedSection.id)!;
@@ -815,6 +1185,23 @@ export default function PresentationGroupPage() {
     const isEditing = editingGroupId === groupId;
     
     if (!currentGroup) return null; // Add safety check for currentGroup
+    
+    // Force fetch fresh data for this specific group if needed
+    const groupMembersList = groupMembers.get(Number(currentGroup.id)) || [];
+    
+    // Get unique members to prevent duplicates in the UI
+    const uniqueGroupMembers = getUniqueMembers(groupMembersList);
+    
+    // console.log(`Rendering ${uniqueGroupMembers.length} unique members from ${groupMembersList.length} total members for group ${currentGroup.id}`);
+    
+    // If no members are loaded, show loading state but don't fetch directly in render function
+    if (uniqueGroupMembers.length === 0) {
+      return (
+        <div className="flex justify-center items-center py-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-500"></div>
+        </div>
+      );
+    }
     
     return (
       <div className="mb-6">
@@ -935,7 +1322,7 @@ export default function PresentationGroupPage() {
               
               <div className="space-y-3">
                 {membersList.map((member, index) => (
-                  <div key={index} className="flex items-start gap-2">
+                  <div key={member.id ? `member-${member.id}-${refreshKey}` : `new-member-${index}-${refreshKey}`} className="flex items-start gap-2">
                     <div className="flex-1">
                       <input
                         type="text"
@@ -957,23 +1344,25 @@ export default function PresentationGroupPage() {
                 ))}
               </div>
               
+              <div className="flex flex-col gap-2 mt-4">
               {membersList.length < selectedSection.max_members - 1 && (
                 <button
                   type="button"
                   onClick={addMember}
-                  className="mt-3 px-3 py-2 bg-indigo-700/50 text-indigo-200 rounded-lg hover:bg-indigo-600/50 transition-colors flex items-center text-sm"
+                    className="px-3 py-2 bg-indigo-700/50 text-indigo-200 rounded-lg hover:bg-indigo-600/50 transition-colors flex items-center text-sm"
                 >
                   <PlusCircle className="h-4 w-4 mr-2" />
                   {t('presentationGroupPage.addMember')}
                 </button>
               )}
+              </div>
             </div>
             
             <div className="flex space-x-3">
               <button
                 onClick={saveMemberChanges}
                 disabled={isUpdatingMembers}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg flex items-center disabled:opacity-50"
+                className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg flex items-center justify-center disabled:opacity-50"
               >
                 {isUpdatingMembers ? (
                   <>
@@ -993,11 +1382,23 @@ export default function PresentationGroupPage() {
               
               <button
                 onClick={cancelEditingMembers}
-                className="px-4 py-2 bg-gray-600/60 hover:bg-gray-500/80 text-white rounded-lg"
+                className="px-6 py-2 bg-gray-600/60 hover:bg-gray-500/80 text-white rounded-lg"
               >
                 {t('presentationGroupPage.cancel')}
               </button>
             </div>
+            
+            {successMessage && (
+              <div className="mt-4 flex justify-center">
+                <button
+                  onClick={() => forceHardRefresh()}
+                  className="px-4 py-2 bg-green-600/60 hover:bg-green-500/80 text-white rounded-lg flex items-center"
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Refresh Page Now
+                </button>
+              </div>
+            )}
           </div>
         ) : null}
         
@@ -1062,130 +1463,143 @@ export default function PresentationGroupPage() {
           )}
         </div>
         
-        {/* Presentation File Upload Section */}
-        {!isEditing && !editingMembers && currentGroup && (
-          <div className="mt-4 bg-indigo-800/30 rounded-lg border border-indigo-700/30 p-4">
-            <h3 className="font-medium text-indigo-100 text-lg mb-3 flex items-center">
-              <Presentation className="h-5 w-5 mr-2 text-indigo-400" />
+        {/* Presentation Upload Section */}
+        <div className="mb-4 bg-indigo-800/30 rounded-lg border border-indigo-700/30 p-4">
+          <div className="flex justify-between items-center mb-3">
+            <h4 className="text-md font-medium text-indigo-100 flex items-center">
+              <Presentation className="h-4 w-4 mr-2 text-indigo-300" />
               {t('presentationGroupPage.presentation')}
-            </h3>
-            
-            {fileUploadError && (
-              <div className="mb-4 p-3 bg-red-900/30 border border-red-800/30 rounded-lg text-red-100 flex items-center">
-                <XCircle className="h-5 w-5 mr-2 text-red-400" />
-                {fileUploadError}
+            </h4>
+          </div>
+          
+          {fileUploadError && (
+            <div className="mb-3 p-2 bg-red-900/20 border border-red-800/30 rounded-lg text-red-300 text-sm flex items-start">
+              <AlertTriangle className="h-4 w-4 mr-2 flex-shrink-0 mt-0.5" />
+              <span>{fileUploadError}</span>
+                </div>
+          )}
+          
+          {fileUploadSuccess && (
+            <div className="mb-3 p-2 bg-green-900/20 border border-green-800/30 rounded-lg text-green-300 text-sm flex items-start">
+              <CheckCircle className="h-4 w-4 mr-2 flex-shrink-0 mt-0.5" />
+              <span>{fileUploadSuccess}</span>
+                </div>
+          )}
+          
+          {presentationFiles.has(Number(currentGroup.id)) ? (
+            <div>
+              <div className="p-3 bg-indigo-700/20 rounded-lg mb-3">
+                <div className="flex justify-between items-start">
+                  <div className="flex items-center">
+                    <FileIcon className="h-5 w-5 mr-2 text-indigo-300 flex-shrink-0" />
+                    <div className="text-indigo-100 text-sm truncate mr-2">
+                      {presentationFiles.get(Number(currentGroup.id))!.name}
               </div>
-            )}
-            
-            {fileUploadSuccess && (
-              <div className="mb-4 p-3 bg-green-900/30 border border-green-800/30 rounded-lg text-green-100 flex items-center">
-                <CheckCircle className="h-5 w-5 mr-2 text-green-400" />
-                {fileUploadSuccess}
-              </div>
-            )}
-            
-            {/* Current File Display */}
-            {presentationFiles.has(Number(currentGroup.id)) && (
-              <div className="mb-4">
-                {renderFileLink(Number(currentGroup.id))}
-              </div>
-            )}
-            
-            <div className="mb-3 p-3 bg-amber-800/30 text-amber-200 text-sm rounded-lg border border-amber-700/30">
-              {presentationFiles.has(Number(currentGroup.id))
-                ? t('presentationGroupPage.replaceNote')
-                : t('presentationGroupPage.presentationNote')}
-            </div>
-            
-            <label
-              htmlFor={`file-upload-${currentGroup.id}`}
-              className={`flex items-center justify-center p-4 border-2 border-dashed border-indigo-600/50 rounded-lg hover:bg-indigo-700/30 transition-colors cursor-pointer ${
-                uploadingFile ? 'opacity-50 cursor-not-allowed' : ''
-              }`}
-            >
-              <div className="text-center">
-                <Upload className="mx-auto h-8 w-8 text-indigo-400 mb-2" />
-                <span className="font-medium text-indigo-200">
-                  {presentationFiles.has(Number(currentGroup.id))
-                    ? t('presentationGroupPage.replacePresentationFile')
-                    : t('presentationGroupPage.uploadPresentation')}
-                </span>
-                <p className="text-xs text-indigo-400 mt-1">
-                  PowerPoint files only (.ppt, .pptx), max 10MB
-                </p>
-                
-                {uploadingFile && (
-                  <div className="flex flex-col items-center mt-2">
-                    <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-indigo-500 mb-2"></div>
-                    <span className="text-sm text-indigo-300">
-                      {t('presentationGroupPage.uploadingPresentation')}
-                    </span>
                   </div>
-                )}
+                  <div className="flex-shrink-0 px-2 py-0.5 bg-green-600/30 rounded text-xs text-green-300 flex items-center">
+                    <CheckCircle className="h-3 w-3 mr-1" />
+                    {t('presentationGroupPage.uploaded')}
+                  </div>
+                </div>
+                <div className="mt-2 text-xs text-amber-300 flex items-center">
+                  <AlertTriangle className="h-3 w-3 mr-1" />
+                  {t('presentationGroupPage.fileDownloadNotAllowed')}
+                </div>
               </div>
-              <input
-                id={`file-upload-${currentGroup.id}`}
-                type="file"
-                accept=".ppt,.pptx,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation"
-                className="hidden"
-                onChange={(e) => handleFileUpload(e, Number(currentGroup.id))}
-                disabled={uploadingFile}
-              />
-            </label>
-          </div>
-        )}
-        
-        {/* Group Details */}
-        {!isEditing && !editingMembers && currentGroup && (
-          <div className="bg-indigo-800/30 rounded-lg border border-indigo-700/30 overflow-hidden">
-            <div className="p-4">
-              <h3 className="font-medium text-indigo-100 text-lg mb-2">
-                {currentGroup.name || `Group ${currentGroup.id}`}
-              </h3>
               
-              {currentGroup.notes && (
-                <div className="mb-3 p-3 bg-indigo-700/20 rounded-lg text-indigo-200 text-sm">
-                  {currentGroup.notes}
-                </div>
-              )}
-              
-              <h4 className="text-sm font-medium text-indigo-300 mt-4 mb-2">
-                {t('presentationGroupPage.members')}
-              </h4>
-              
-              {groupMembers.has(Number(currentGroup.id)) ? (
-                <ul className="space-y-2">
-                  {groupMembers.get(Number(currentGroup.id))!.map((member) => (
-                    <li 
-                      key={member.id} 
-                      className="flex items-center p-2 rounded bg-indigo-700/20"
-                    >
-                      <div className="w-6 h-6 rounded-full bg-indigo-600 flex items-center justify-center mr-2">
-                        <span className="text-white font-medium text-xs">
-                          {member.name.charAt(0).toUpperCase()}
-                        </span>
-                      </div>
-                      <div className="text-sm">
-                        <span className="font-medium text-indigo-100">
-                          {member.name}
-                          {member.is_creator && (
-                            <span className="ml-2 text-xs bg-indigo-600/50 text-indigo-200 px-1.5 py-0.5 rounded-full">
-                              {t('presentationGroupPage.creator')}
-                            </span>
-                          )}
-                        </span>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <div className="flex justify-center items-center h-16">
-                  <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-indigo-500"></div>
-                </div>
-              )}
+              <div className="mt-2">
+                <label htmlFor={`file-upload-${currentGroup.id}`} className="w-full cursor-pointer">
+                  <div className="px-4 py-2 bg-indigo-700/40 hover:bg-indigo-600/40 text-indigo-200 rounded-lg flex items-center justify-center transition-colors text-sm">
+                    <Upload className="h-4 w-4 mr-2" />
+                    {t('presentationGroupPage.replacePresentationFile')}
+                  </div>
+                  <input
+                    id={`file-upload-${currentGroup.id}`}
+                    type="file"
+                    className="hidden"
+                    accept=".ppt,.pptx,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation"
+                    onChange={(e) => handleFileUpload(e, Number(currentGroup.id))}
+                    disabled={uploadingFile}
+                  />
+                </label>
+                <p className="mt-2 text-xs text-indigo-400">
+                  {t('presentationGroupPage.replaceNote')}
+                </p>
+              </div>
             </div>
+          ) : (
+            <div>
+              <div className="p-3 mb-3 bg-amber-900/20 border border-amber-800/30 rounded-lg text-amber-300 text-sm flex items-start">
+                <AlertTriangle className="h-4 w-4 mr-2 flex-shrink-0 mt-0.5" />
+                <span>{t('presentationGroupPage.presentationRequired')}</span>
+              </div>
+              
+              <label htmlFor={`file-upload-${currentGroup.id}`} className="w-full cursor-pointer">
+                <div className={`px-4 py-3 bg-indigo-600/60 hover:bg-indigo-600/70 text-white rounded-lg flex items-center justify-center transition-colors ${uploadingFile ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                  {uploadingFile ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      {t('presentationGroupPage.uploadingPresentation')}
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="h-5 w-5 mr-2" />
+                      {t('presentationGroupPage.uploadPresentation')}
+                    </>
+                  )}
+                </div>
+                <input
+                  id={`file-upload-${currentGroup.id}`}
+                  type="file"
+                  className="hidden"
+                  accept=".ppt,.pptx,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation"
+                  onChange={(e) => handleFileUpload(e, Number(currentGroup.id))}
+                  disabled={uploadingFile}
+                />
+              </label>
+              <p className="mt-2 text-xs text-indigo-400">
+                {t('presentationGroupPage.presentationNote')}
+              </p>
+              </div>
+            )}
           </div>
-        )}
+        
+        {/* Group Details - SHOW GROUP MEMBERS */}
+        <div className="bg-indigo-800/30 rounded-lg border border-indigo-700/30 p-4">
+          <h3 className="text-lg font-medium text-indigo-100 mb-3">
+            {t('presentationGroupPage.members')}
+          </h3>
+          
+          {/* Always show the latest members from groupMembers */}
+          <GroupMembersList 
+            members={groupMembersList}
+            refreshKey={refreshKey}
+            creatorLabel={t('presentationGroupPage.creator')}
+            noMembersText={t('presentationGroupPage.noMembers')}
+          />
+          
+          {/* Removing the refresh button as requested */}
+        </div>
+      </div>
+    );
+  };
+
+  // Add a manual refresh button component
+  const ManualRefreshButton = () => {
+    if (!successMessage) return null;
+    
+    return (
+      <div className="mt-4 flex justify-start">
+        <button
+          onClick={() => window.location.reload()}
+          className="px-4 py-2 bg-indigo-700 hover:bg-indigo-600 text-white rounded-md flex items-center transition-colors"
+        >
+          <RefreshCw className="h-4 w-4 mr-2" />
+          Refresh Page Now
+        </button>
       </div>
     );
   };
@@ -1288,9 +1702,9 @@ export default function PresentationGroupPage() {
 
               {/* Success/Error Messages */}
               {successMessage && (
-                <div className="mb-4 p-3 bg-green-900/30 border border-green-800/30 rounded-lg text-green-100 flex items-center">
-                  <CheckCircle className="h-5 w-5 mr-2 text-green-400" />
+                <div className="mt-4 bg-indigo-800/50 border border-indigo-700/50 rounded-lg p-3 text-indigo-100">
                   {successMessage}
+                  {successMessage.includes('members') && <ManualRefreshButton />}
                 </div>
               )}
               
@@ -1494,14 +1908,15 @@ export default function PresentationGroupPage() {
                                   <li 
                                     key={member.id} 
                                     className="flex items-center p-2 rounded bg-indigo-700/20"
+                                    data-member-id={String(member.id)}
                                   >
                                     <div className="w-6 h-6 rounded-full bg-indigo-600 flex items-center justify-center mr-2">
-                                      <span className="text-white font-medium text-xs">
+                                      <span className="text-white font-medium text-xs member-avatar">
                                         {member.name.charAt(0).toUpperCase()}
                                       </span>
                                     </div>
                                     <div className="text-sm">
-                                      <span className="font-medium text-indigo-100">
+                                      <span className="font-medium text-indigo-100 member-name">
                                         {member.name}
                                         {member.is_creator && (
                                           <span className="ml-2 text-xs bg-indigo-600/50 text-indigo-200 px-1.5 py-0.5 rounded-full">
