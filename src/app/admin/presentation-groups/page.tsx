@@ -495,6 +495,7 @@ export default function PresentationGroupsAdminPage() {
     try {
       // Set the section as downloading
       setSectionDownloading(section.id);
+      setIsDownloading(true);
       
       // Make sure we have the groups for this section
       if (!sectionGroups.has(section.id)) {
@@ -533,9 +534,9 @@ export default function PresentationGroupsAdminPage() {
           for (let i = 0; i < members.length; i++) {
             const member = members[i];
             sheetData.push([
-              group.name || `Group ${group.id}`,
+              group.name || `Group ${group.id}`,  // Show group name for all rows
               member.name,
-              group.notes || ''
+              group.notes || ''  // Show topic for all rows
             ]);
           }
         }
@@ -545,8 +546,23 @@ export default function PresentationGroupsAdminPage() {
       const worksheet = XLSX.utils.aoa_to_sheet(sheetData);
       XLSX.utils.book_append_sheet(workbook, worksheet, `Section - ${section.title}`);
       
-      // Generate and download the file
-      XLSX.writeFile(workbook, `${section.title.replace(/[^a-zA-Z0-9]/g, '_')}_groups.xlsx`);
+      // Generate and download the file using the blob method which is more reliable
+      const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+      const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      
+      // Create a URL for the blob
+      const url = URL.createObjectURL(blob);
+      
+      // Create a temporary link and trigger download
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${section.title.replace(/[^a-zA-Z0-9]/g, '_')}_groups.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      
+      // Clean up
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
       
       // Set success message
       setSuccessMessage(`Downloaded data for ${groups.length} groups in ${section.title}`);
@@ -555,6 +571,7 @@ export default function PresentationGroupsAdminPage() {
       setErrorMessage('Failed to generate Excel file: ' + (error instanceof Error ? error.message : 'Unknown error'));
     } finally {
       setSectionDownloading(null);
+      setIsDownloading(false);
     }
   };
 
