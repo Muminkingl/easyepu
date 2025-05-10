@@ -1075,9 +1075,6 @@ export default function PresentationGroupPage() {
           <div className="text-indigo-300 text-sm truncate mr-2">
             {fileData.name}
           </div>
-          <span className="text-xs text-indigo-400 ml-auto">
-            {new Date(fileData.url.split('/').pop()?.split('-')[0] || '').toLocaleDateString()}
-          </span>
         </div>
         <div className="mt-2 text-xs text-amber-300 flex items-center">
           <AlertTriangle className="h-3 w-3 mr-1" />

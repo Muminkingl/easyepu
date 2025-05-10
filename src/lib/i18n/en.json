@@ -371,6 +371,9 @@
     "returnToCourses": "Return to Courses"
   },
   "presentationGroupPage": {
+    "uploaded✓": "uploaded✓",
+    "uploaded ✓": "uploaded ✓",
+    "uploaded": "uploaded",
     "title": "Presentation Groups",
     "subtitle": "Join or create presentation groups for your courses",
     "refresh": "Refresh",
@@ -432,6 +435,7 @@
     "replacePresentationFile": "Replace PowerPoint",
     "presentationUploaded": "PowerPoint Uploaded",
     "presentationRequired": "PowerPoint Required",
+    "uploadCheckmark": "Upload Complete",
     "presentationNote": "Note: Once uploaded, presentations cannot be downloaded by students. Only admins can download presentations. If you need to make changes, please upload a new file.",
     "replaceNote": "Note: Uploading a new file will replace your current presentation. This action cannot be undone.",
     "saved": "Saved",
@@ -442,6 +446,7 @@
     "fileTooBig": "File is too large. Maximum size is 10MB",
     "invalidFileType": "Invalid file type. Only PowerPoint files (.ppt, .pptx) are allowed",
     "currentFile": "Current file",
+    "currentFileDateFormat": "",
     "downloadPresentation": "Download Presentation",
     "noPresentation": "No presentation uploaded yet",
     "fileDownloadNotAllowed": "Downloads disabled for students. Contact admin if needed."
