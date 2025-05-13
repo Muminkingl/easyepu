@@ -476,8 +476,9 @@ export default function CoursePage({ params }: CoursePageProps) {
                                         {file.file_url && (
                                           <button 
                                             onClick={(e) => {
+                                              e.preventDefault();
                                               e.stopPropagation();
-                                              handleFileAction(file.file_url, file.title);
+                                              file.file_url && handleFileAction(file.file_url, file.title);
                                             }}
                                             className="ml-2 p-2 hover:bg-indigo-700/50 rounded-full transition-colors"
                                             title="View File"
@@ -569,8 +570,9 @@ export default function CoursePage({ params }: CoursePageProps) {
                       <button 
                         key={file.id} 
                         onClick={(e) => {
+                          e.preventDefault();
                           e.stopPropagation();
-                          handleFileAction(file.file_url, file.title);
+                          file.file_url && handleFileAction(file.file_url, file.title);
                         }}
                         className="flex items-center p-3 w-full text-left bg-indigo-950/50 hover:bg-indigo-800/30 border border-indigo-800/30 hover:border-indigo-700/50 rounded-xl transition-all group"
                       >
@@ -581,7 +583,7 @@ export default function CoursePage({ params }: CoursePageProps) {
                           <div className="font-medium text-white group-hover:text-indigo-200 transition-colors">{file.title}</div>
                           <div className="text-xs text-indigo-400">{file.file_type.toUpperCase()}</div>
                         </div>
-                        <Download className="h-4 w-4 text-indigo-300 opacity-70 group-hover:opacity-100" />
+                        <FileIcon className="h-4 w-4 text-indigo-300 opacity-70 group-hover:opacity-100" />
                       </button>
                     ))}
                   
@@ -589,6 +591,7 @@ export default function CoursePage({ params }: CoursePageProps) {
                   {files.length > 3 && (
                     <button
                       onClick={(e) => {
+                        e.preventDefault();
                         e.stopPropagation();
                         setShowAllResources(!showAllResources);
                       }}
@@ -697,20 +700,54 @@ export default function CoursePage({ params }: CoursePageProps) {
                   </p>
                   
                   <div className="flex gap-4">
-                    <a
-                      href={fileViewerUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                    <button
                       className="px-4 py-2 bg-indigo-700 hover:bg-indigo-600 rounded-lg text-white flex items-center gap-2"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        window.open(fileViewerUrl, '_blank');
-                        setShowFileViewer(false);
+                      onClick={() => {
+                        if (fileViewerUrl && fileViewerUrl.startsWith('blob:')) {
+                          // For blob URLs, create a temporary download link using fetch
+                          try {
+                            const xhr = new XMLHttpRequest();
+                            xhr.open('GET', fileViewerUrl);
+                            xhr.responseType = 'blob';
+                            xhr.onload = function() {
+                              if (this.status === 200) {
+                                // Create a new blob URL from the response
+                                const blob = new Blob([this.response]);
+                                const url = URL.createObjectURL(blob);
+                                
+                                // Create a link and click it
+                                const a = document.createElement('a');
+                                a.style.display = 'none';
+                                a.href = url;
+                                a.download = fileViewerName || 'download';
+                                document.body.appendChild(a);
+                                a.click();
+                                
+                                // Clean up
+                                setTimeout(() => {
+                                  document.body.removeChild(a);
+                                  URL.revokeObjectURL(url);
+                                }, 100);
+                              }
+                            };
+                            xhr.send();
+                          } catch (e) {
+                            console.error('Download failed:', e);
+                            alert('Unable to download this file format.');
+                          }
+                        }
                       }}
                     >
-                      <ExternalLink className="h-4 w-4" />
-                      Open in New Tab
-                    </a>
+                      <Download className="h-4 w-4 mr-2" />
+                      Download
+                    </button>
+                    
+                    <button
+                      className="px-4 py-2 bg-indigo-800/50 hover:bg-indigo-700/50 rounded-lg text-white"
+                      onClick={() => setShowFileViewer(false)}
+                    >
+                      Close
+                    </button>
                   </div>
                 </div>
               )}
