@@ -142,45 +142,27 @@ export default function CoursesPage() {
   // Render course card (grid view)
   const renderCourseCard = (course: Course) => {
     const isSaved = savedCourses.includes(course.id);
+    // Dynamically adjust font size based on title length
+    const titleFontSize = course.title.length > 25 ? 'text-lg' : 'text-xl';
     
     return (
       <div key={course.id} className="group h-full">
-        <div className="relative h-52 sm:h-64 rounded-xl shadow-md overflow-hidden hover:shadow-xl transition-all duration-300 border border-indigo-800/30 backdrop-blur-sm">
+        <div className="relative h-52 sm:h-64 rounded-xl shadow-md overflow-hidden hover:shadow-xl transition-all duration-300 border border-indigo-900/40 backdrop-blur-sm bg-[#0c0a1f]">
           <Link href={`/dashboard/courses/${course.id}`} className="block absolute inset-0 z-10">
             <span className="sr-only">{t('coursesPage.view')}</span>
           </Link>
           
           {/* Course background - using the specified background color or a default */}
-          <div className={`absolute inset-0 ${course.background_color || 'bg-indigo-900/30'}`}>
-            {course.title.toLowerCase().includes('program') && (
-              <div className="absolute inset-0 flex items-center justify-center opacity-60 p-4">
-                <div className="text-left font-mono text-xs overflow-hidden">
-                  <div className="text-indigo-300">
-                    <span className="text-pink-300">var</span> <span className="text-blue-300">w</span> = <span className="text-green-300">window</span>;
-                  </div>
-                  <div className="text-indigo-300">
-                    <span className="text-pink-300">if</span> (<span className="text-blue-300">w</span> &amp;&amp; <span className="text-blue-300">w</span>.<span className="text-blue-300">console</span>) {'{'}
-                  </div>
-                  <div className="text-indigo-300 pl-4">
-                    <span className="text-gray-300">// Output the course name</span>
-                  </div>
-                  <div className="text-indigo-300 pl-4">
-                    <span className="text-blue-300">console</span>.<span className="text-blue-300">log</span>(<span className="text-amber-300">"{course.title}"</span>);
-                  </div>
-                  <div className="text-indigo-300">{'}'};</div>
-                </div>
-              </div>
-            )}
-            
+          <div className={`absolute inset-0 ${course.background_color || 'bg-[#131033]'}`}>
             {course.image_url ? (
               <img 
                 src={course.image_url} 
                 alt={course.title}
-                className="absolute inset-0 w-full h-full object-cover opacity-70 mix-blend-overlay"
+                className="w-full h-[calc(100%-80px)] object-cover"
               />
-            ) : !course.title.toLowerCase().includes('program') && (
+            ) : (
               <div className="flex items-center justify-center h-full">
-                <BookOpen className="h-16 w-16 text-white opacity-30" />
+                <BookOpen className="h-16 w-16 opacity-30 text-white" />
               </div>
             )}
           </div>
@@ -192,25 +174,22 @@ export default function CoursesPage() {
               e.stopPropagation();
               toggleSaveCourse(course.id);
             }}
-            className="absolute top-3 right-3 z-20 bg-indigo-800/50 hover:bg-indigo-700/50 p-2 rounded-full transition-colors"
+            className="absolute top-3 right-3 z-20 bg-indigo-900/60 hover:bg-indigo-800/60 p-2 rounded-full transition-colors"
             title={isSaved ? t('coursesPage.unsave') : t('coursesPage.save')}
           >
             <Bookmark className={`h-4 w-4 text-white ${isSaved ? 'fill-white' : ''}`} />
           </button>
           
           {/* Course title and description at bottom */}
-          <div className="absolute bottom-0 inset-x-0 p-4">
-            <div className="bg-indigo-900/80 backdrop-blur-sm p-4 rounded-md border-t border-indigo-700/30">
-              <h3 className="text-lg font-medium text-white truncate">{course.title}</h3>
-              
-              {course.instructor_name && (
-                <div className="mt-1 text-xs text-indigo-300">
-                  {t('coursesPage.instructor')}: {course.instructor_name}
-                </div>
-              )}
-              
+          <div className="absolute bottom-0 inset-x-0">
+            <div className="p-5 bg-[#0f0c24] border-t border-indigo-900/30">
+              <h3 className={`font-bold ${titleFontSize} mb-2 text-indigo-100`}>
+                {course.title}
+              </h3>
               {course.description && (
-                <p className="mt-2 text-sm text-indigo-200 line-clamp-2">{course.description}</p>
+                <p className="text-indigo-300 text-sm line-clamp-2">
+                  {course.description}
+                </p>
               )}
             </div>
           </div>
@@ -226,22 +205,22 @@ export default function CoursesPage() {
     return (
       <div 
         key={course.id} 
-        className="relative flex items-center bg-indigo-950/20 backdrop-blur-sm p-3 rounded-lg border border-indigo-800/30 mb-2 hover:bg-indigo-900/30 transition-colors"
+        className="relative flex items-center bg-[#0c0a1f] backdrop-blur-sm p-3 rounded-lg border border-indigo-900/40 mb-2 hover:bg-[#131033] transition-colors"
       >
         <Link href={`/dashboard/courses/${course.id}`} className="block absolute inset-0 z-10">
           <span className="sr-only">{t('coursesPage.view')}</span>
         </Link>
         
-        <div className={`h-10 w-10 flex items-center justify-center rounded-md ${course.background_color || 'bg-indigo-900/30'}`}>
+        <div className={`h-12 w-12 flex items-center justify-center rounded-md ${course.background_color || 'bg-[#131033]'}`}>
           {course.image_url ? (
             <img src={course.image_url} alt="" className="h-full w-full object-cover rounded-md" />
           ) : (
-            <BookOpen className="h-5 w-5 text-white opacity-70" />
+            <BookOpen className="h-6 w-6 opacity-30 text-white" />
           )}
         </div>
         
         <div className="ml-3 flex-1 min-w-0">
-          <h3 className="text-base font-medium text-white truncate">{course.title}</h3>
+          <h3 className="text-base font-bold text-indigo-100 truncate">{course.title}</h3>
           {course.description && (
             <p className="mt-1 text-xs text-indigo-300 truncate">{course.description}</p>
           )}
@@ -253,7 +232,7 @@ export default function CoursesPage() {
             e.stopPropagation();
             toggleSaveCourse(course.id);
           }}
-          className="z-20 bg-indigo-800/50 hover:bg-indigo-700/50 p-2 rounded-full transition-colors"
+          className="z-20 bg-indigo-900/60 hover:bg-indigo-800/60 p-2 rounded-full transition-colors"
           title={isSaved ? t('coursesPage.unsave') : t('coursesPage.save')}
         >
           <Bookmark className={`h-4 w-4 text-white ${isSaved ? 'fill-white' : ''}`} />
