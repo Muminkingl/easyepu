@@ -189,22 +189,78 @@ export default function CoursePage({ params }: CoursePageProps) {
     if (!fileUrl) return;
 
     try {
-      // For blob URLs, show in our embedded viewer
-      if (fileUrl.startsWith('blob:')) {
-        console.log('Opening file in embedded viewer:', fileName);
+      // Try direct download for all files first
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = fileUrl;
+      a.download = fileName || 'download';
+      document.body.appendChild(a);
+      a.click();
+      
+      // Also show preview for compatible file types
+      const fileType = determineFileType(fileName);
+      if (['image', 'video', 'audio', 'pdf'].includes(fileType)) {
         setFileViewerUrl(fileUrl);
         setFileViewerName(fileName);
-        setFileViewerType(determineFileType(fileName));
+        setFileViewerType(fileType);
         setShowFileViewer(true);
-        return;
       }
       
-      // For regular URLs, use the proxy API
-      const proxyUrl = `/api/download?url=${encodeURIComponent(fileUrl)}&filename=${encodeURIComponent(fileName)}`;
-      window.open(proxyUrl, '_blank');
+      // Clean up
+      setTimeout(() => {
+        document.body.removeChild(a);
+        if (fileUrl.startsWith('blob:')) {
+          // Don't revoke URL here as we're using it for preview
+        }
+      }, 100);
     } catch (error) {
       console.error('File handling error:', error);
-      alert('Could not open this file. Please try again or contact support.');
+      
+      // Show preview as fallback if download fails
+      const fileType = determineFileType(fileName);
+      if (['image', 'video', 'audio', 'pdf'].includes(fileType)) {
+        setFileViewerUrl(fileUrl);
+        setFileViewerName(fileName);
+        setFileViewerType(fileType);
+        setShowFileViewer(true);
+      } else {
+        // For other file types, try alternative download methods
+        if (fileUrl.startsWith('blob:')) {
+          try {
+            const xhr = new XMLHttpRequest();
+            xhr.open('GET', fileUrl);
+            xhr.responseType = 'blob';
+            xhr.onload = function() {
+              if (this.status === 200) {
+                const blob = new Blob([this.response]);
+                const url = URL.createObjectURL(blob);
+                
+                // Create a link and click it
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = fileName || 'download';
+                document.body.appendChild(a);
+                a.click();
+                
+                // Clean up
+                setTimeout(() => {
+                  document.body.removeChild(a);
+                  URL.revokeObjectURL(url);
+                }, 100);
+              }
+            };
+            xhr.send();
+          } catch (e) {
+            console.error('All download attempts failed:', e);
+            alert('Unable to download this file. Please try a different browser.');
+          }
+        } else {
+          // For non-blob URLs, use the proxy API as a last resort
+          const proxyUrl = `/api/download?url=${encodeURIComponent(fileUrl)}&filename=${encodeURIComponent(fileName)}`;
+          window.open(proxyUrl, '_blank');
+        }
+      }
     }
   };
 
@@ -478,7 +534,7 @@ export default function CoursePage({ params }: CoursePageProps) {
                                             onClick={(e) => {
                                               e.preventDefault();
                                               e.stopPropagation();
-                                              file.file_url && handleFileAction(file.file_url, file.title);
+                                              handleFileAction(file.file_url, file.title);
                                             }}
                                             className="ml-2 p-2 hover:bg-indigo-700/50 rounded-full transition-colors"
                                             title="View File"
@@ -572,7 +628,7 @@ export default function CoursePage({ params }: CoursePageProps) {
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
-                          file.file_url && handleFileAction(file.file_url, file.title);
+                          handleFileAction(file.file_url, file.title);
                         }}
                         className="flex items-center p-3 w-full text-left bg-indigo-950/50 hover:bg-indigo-800/30 border border-indigo-800/30 hover:border-indigo-700/50 rounded-xl transition-all group"
                       >
@@ -702,39 +758,25 @@ export default function CoursePage({ params }: CoursePageProps) {
                   <div className="flex gap-4">
                     <button
                       className="px-4 py-2 bg-indigo-700 hover:bg-indigo-600 rounded-lg text-white flex items-center gap-2"
-                      onClick={() => {
-                        if (fileViewerUrl && fileViewerUrl.startsWith('blob:')) {
-                          // For blob URLs, create a temporary download link using fetch
-                          try {
-                            const xhr = new XMLHttpRequest();
-                            xhr.open('GET', fileViewerUrl);
-                            xhr.responseType = 'blob';
-                            xhr.onload = function() {
-                              if (this.status === 200) {
-                                // Create a new blob URL from the response
-                                const blob = new Blob([this.response]);
-                                const url = URL.createObjectURL(blob);
-                                
-                                // Create a link and click it
-                                const a = document.createElement('a');
-                                a.style.display = 'none';
-                                a.href = url;
-                                a.download = fileViewerName || 'download';
-                                document.body.appendChild(a);
-                                a.click();
-                                
-                                // Clean up
-                                setTimeout(() => {
-                                  document.body.removeChild(a);
-                                  URL.revokeObjectURL(url);
-                                }, 100);
-                              }
-                            };
-                            xhr.send();
-                          } catch (e) {
-                            console.error('Download failed:', e);
-                            alert('Unable to download this file format.');
-                          }
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (fileViewerUrl) {
+                          // Force direct download attempt for all URLs
+                          const a = document.createElement('a');
+                          a.style.display = 'none';
+                          a.href = fileViewerUrl;
+                          a.download = fileViewerName || 'download';
+                          document.body.appendChild(a);
+                          a.click();
+                          
+                          // Clean up
+                          setTimeout(() => {
+                            document.body.removeChild(a);
+                            if (fileViewerUrl.startsWith('blob:')) {
+                              URL.revokeObjectURL(fileViewerUrl);
+                            }
+                          }, 100);
                         }
                       }}
                     >
