@@ -24,10 +24,12 @@ import {
   Star,
   Shield,
   X,
-  Info
+  Info,
+  ExternalLink,
+  Maximize2,
+  Minimize2
 } from 'lucide-react';
 import { Course, CourseSection, CourseFile } from '@/lib/supabase';
-import { tryAllBlobDownloadMethods } from '@/lib/fileUtils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslations } from '@/lib/i18n';
 
@@ -44,6 +46,11 @@ export default function CoursePage({ params }: CoursePageProps) {
   const [showBlobModal, setShowBlobModal] = useState(false);
   const [currentBlob, setCurrentBlob] = useState<string | null>(null);
   const [currentFileName, setCurrentFileName] = useState<string | null>(null);
+  const [showFileViewer, setShowFileViewer] = useState(false);
+  const [fileViewerUrl, setFileViewerUrl] = useState<string | null>(null);
+  const [fileViewerName, setFileViewerName] = useState<string | null>(null);
+  const [fileViewerType, setFileViewerType] = useState<string | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const { t, dir } = useTranslations();
   
   // Using Next.js 15+ approach with use() to unwrap params
@@ -154,36 +161,41 @@ export default function CoursePage({ params }: CoursePageProps) {
     setIsSaved(!isSaved);
   };
 
-  // Add a function to handle file downloads correctly
-  const handleFileDownload = (fileUrl: string, fileName: string) => {
+  // Helper function to determine file type based on name or extension
+  const determineFileType = (fileName: string): string => {
+    const extension = fileName.split('.').pop()?.toLowerCase() || '';
+    
+    if (['pdf'].includes(extension)) {
+      return 'pdf';
+    } else if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(extension)) {
+      return 'image';
+    } else if (['mp4', 'webm', 'mov'].includes(extension)) {
+      return 'video';
+    } else if (['mp3', 'wav', 'ogg'].includes(extension)) {
+      return 'audio';
+    } else if (['doc', 'docx'].includes(extension)) {
+      return 'document';
+    } else if (['ppt', 'pptx'].includes(extension)) {
+      return 'presentation';
+    } else if (['xls', 'xlsx', 'csv'].includes(extension)) {
+      return 'spreadsheet';
+    } else {
+      return 'generic';
+    }
+  };
+
+  // Add a function to handle file viewing instead of downloading
+  const handleFileAction = (fileUrl: string, fileName: string) => {
     if (!fileUrl) return;
 
     try {
-      // For blob URLs, use our specialized utility that tries multiple methods
+      // For blob URLs, show in our embedded viewer
       if (fileUrl.startsWith('blob:')) {
-        console.log('Attempting to download blob URL:', fileUrl);
-        
-        // Show a loading message
-        const downloadingMessage = `Starting download for "${fileName}"...`;
-        alert(downloadingMessage);
-        
-        // Try all our blob download methods
-        tryAllBlobDownloadMethods(fileUrl, fileName)
-          .then(success => {
-            if (!success) {
-              console.error('All download methods failed');
-              setCurrentBlob(fileUrl);
-              setCurrentFileName(fileName);
-              setShowBlobModal(true);
-            }
-          })
-          .catch(error => {
-            console.error('Error downloading blob:', error);
-            setCurrentBlob(fileUrl);
-            setCurrentFileName(fileName);
-            setShowBlobModal(true);
-          });
-        
+        console.log('Opening file in embedded viewer:', fileName);
+        setFileViewerUrl(fileUrl);
+        setFileViewerName(fileName);
+        setFileViewerType(determineFileType(fileName));
+        setShowFileViewer(true);
         return;
       }
       
@@ -191,10 +203,14 @@ export default function CoursePage({ params }: CoursePageProps) {
       const proxyUrl = `/api/download?url=${encodeURIComponent(fileUrl)}&filename=${encodeURIComponent(fileName)}`;
       window.open(proxyUrl, '_blank');
     } catch (error) {
-      console.error('Download error:', error);
-      // Fall back to direct opening
-      window.open(fileUrl, '_blank');
+      console.error('File handling error:', error);
+      alert('Could not open this file. Please try again or contact support.');
     }
+  };
+
+  // Toggle fullscreen for the file viewer
+  const toggleFullscreen = () => {
+    setIsFullscreen(!isFullscreen);
   };
 
   if (loading) {
@@ -459,11 +475,14 @@ export default function CoursePage({ params }: CoursePageProps) {
                                         </div>
                                         {file.file_url && (
                                           <button 
-                                            onClick={() => handleFileDownload(file.file_url, file.title)}
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleFileAction(file.file_url, file.title);
+                                            }}
                                             className="ml-2 p-2 hover:bg-indigo-700/50 rounded-full transition-colors"
-                                            title="Download File"
+                                            title="View File"
                                           >
-                                            <Download className="h-5 w-5 text-indigo-300" />
+                                            <FileIcon className="h-5 w-5 text-indigo-300" />
                                           </button>
                                         )}
                                       </motion.div>
@@ -549,7 +568,10 @@ export default function CoursePage({ params }: CoursePageProps) {
                     .map((file: CourseFile) => (
                       <button 
                         key={file.id} 
-                        onClick={() => file.file_url && handleFileDownload(file.file_url, file.title)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleFileAction(file.file_url, file.title);
+                        }}
                         className="flex items-center p-3 w-full text-left bg-indigo-950/50 hover:bg-indigo-800/30 border border-indigo-800/30 hover:border-indigo-700/50 rounded-xl transition-all group"
                       >
                         <div className="h-8 w-8 rounded-md bg-indigo-700/30 flex items-center justify-center text-indigo-300 mr-3">
@@ -566,7 +588,10 @@ export default function CoursePage({ params }: CoursePageProps) {
                   {/* Show more button if there are more than 3 resources */}
                   {files.length > 3 && (
                     <button
-                      onClick={() => setShowAllResources(!showAllResources)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowAllResources(!showAllResources);
+                      }}
                       className="w-full text-center text-sm text-indigo-400 hover:text-indigo-300 pt-2"
                     >
                       {showAllResources ? 'Show less' : 'Show all resources'}
@@ -579,7 +604,122 @@ export default function CoursePage({ params }: CoursePageProps) {
         </div>
       </div>
       
-      {/* Blob URL helper modal */}
+      {/* In-page file viewer modal */}
+      {showFileViewer && fileViewerUrl && (
+        <div className={`fixed inset-0 bg-black/70 z-50 flex items-center justify-center backdrop-blur-sm p-4 ${isFullscreen ? 'p-0' : 'p-4'}`}>
+          <div className={`bg-indigo-900/90 rounded-xl overflow-hidden border border-indigo-700/50 ${isFullscreen ? 'w-full h-full rounded-none' : 'max-w-5xl w-full max-h-[85vh]'}`}>
+            {/* Header with controls */}
+            <div className="flex items-center justify-between bg-indigo-950 px-4 py-3 border-b border-indigo-800/50">
+              <h3 className="text-lg font-medium text-white flex items-center gap-2">
+                <FileIcon className="h-5 w-5 text-indigo-400" />
+                {fileViewerName}
+              </h3>
+              
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={toggleFullscreen}
+                  className="p-2 rounded-lg hover:bg-indigo-800/50 text-indigo-300 hover:text-white transition-colors"
+                  title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
+                >
+                  {isFullscreen ? (
+                    <Minimize2 className="h-5 w-5" />
+                  ) : (
+                    <Maximize2 className="h-5 w-5" />
+                  )}
+                </button>
+                
+                <button 
+                  onClick={() => setShowFileViewer(false)}
+                  className="p-2 rounded-lg hover:bg-indigo-800/50 text-indigo-300 hover:text-white transition-colors"
+                  title="Close Viewer"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+            
+            {/* File viewer content */}
+            <div className={`w-full ${isFullscreen ? 'h-[calc(100vh-56px)]' : 'h-[60vh]'} bg-gray-900/50`}>
+              {fileViewerType === 'pdf' && (
+                <iframe 
+                  src={fileViewerUrl} 
+                  className="w-full h-full" 
+                  title={fileViewerName || "PDF Document"}
+                  sandbox="allow-same-origin"
+                />
+              )}
+              
+              {fileViewerType === 'image' && (
+                <div className="w-full h-full flex items-center justify-center bg-black/40 p-4">
+                  <img 
+                    src={fileViewerUrl} 
+                    alt={fileViewerName || "Image"} 
+                    className="max-w-full max-h-full object-contain"
+                  />
+                </div>
+              )}
+              
+              {fileViewerType === 'video' && (
+                <div className="w-full h-full flex items-center justify-center bg-black">
+                  <video 
+                    src={fileViewerUrl} 
+                    controls 
+                    autoPlay
+                    className="max-w-full max-h-full"
+                  />
+                </div>
+              )}
+              
+              {fileViewerType === 'audio' && (
+                <div className="w-full h-full flex flex-col items-center justify-center p-8">
+                  <div className="w-24 h-24 rounded-full bg-indigo-700/30 flex items-center justify-center mb-8">
+                    <div className="text-5xl">🎵</div>
+                  </div>
+                  <h3 className="text-xl font-medium text-white mb-8">{fileViewerName}</h3>
+                  <audio 
+                    src={fileViewerUrl} 
+                    controls 
+                    autoPlay
+                    className="w-full max-w-md"
+                  />
+                </div>
+              )}
+              
+              {(fileViewerType === 'document' || fileViewerType === 'presentation' || 
+                fileViewerType === 'spreadsheet' || fileViewerType === 'generic') && (
+                <div className="w-full h-full flex flex-col items-center justify-center p-8 text-center">
+                  <div className="mb-8 p-6 bg-indigo-800/20 rounded-full">
+                    <FileIcon className="h-16 w-16 text-indigo-400" />
+                  </div>
+                  <h3 className="text-xl font-medium text-white mb-3">{fileViewerName}</h3>
+                  <p className="text-indigo-300 mb-8 max-w-lg">
+                    This file type cannot be previewed directly in the browser.
+                  </p>
+                  
+                  <div className="flex gap-4">
+                    <a
+                      href={fileViewerUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-4 py-2 bg-indigo-700 hover:bg-indigo-600 rounded-lg text-white flex items-center gap-2"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        window.open(fileViewerUrl, '_blank');
+                        setShowFileViewer(false);
+                      }}
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                      Open in New Tab
+                    </a>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Blob URL helper modal - keep for fallback */}
       {showBlobModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm p-4">
           <div className="bg-indigo-900 rounded-xl shadow-xl max-w-lg w-full border border-indigo-700/50 p-6">
