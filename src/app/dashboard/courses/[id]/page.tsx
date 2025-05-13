@@ -22,9 +22,12 @@ import {
   ChevronDown,
   ArrowRight,
   Star,
-  Shield
+  Shield,
+  X,
+  Info
 } from 'lucide-react';
 import { Course, CourseSection, CourseFile } from '@/lib/supabase';
+import { tryAllBlobDownloadMethods } from '@/lib/fileUtils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslations } from '@/lib/i18n';
 
@@ -38,6 +41,9 @@ export default function CoursePage({ params }: CoursePageProps) {
   const [isSaved, setIsSaved] = useState(false);
   const [activeSection, setActiveSection] = useState<string | null>(null);
   const [showAllResources, setShowAllResources] = useState(false);
+  const [showBlobModal, setShowBlobModal] = useState(false);
+  const [currentBlob, setCurrentBlob] = useState<string | null>(null);
+  const [currentFileName, setCurrentFileName] = useState<string | null>(null);
   const { t, dir } = useTranslations();
   
   // Using Next.js 15+ approach with use() to unwrap params
@@ -151,32 +157,43 @@ export default function CoursePage({ params }: CoursePageProps) {
   // Add a function to handle file downloads correctly
   const handleFileDownload = (fileUrl: string, fileName: string) => {
     if (!fileUrl) return;
-    
+
     try {
-      // Instead of directly using the file URL, use our proxy endpoint
-      const proxyUrl = `/api/download?url=${encodeURIComponent(fileUrl)}&fileName=${encodeURIComponent(fileName)}`;
+      // For blob URLs, use our specialized utility that tries multiple methods
+      if (fileUrl.startsWith('blob:')) {
+        console.log('Attempting to download blob URL:', fileUrl);
+        
+        // Show a loading message
+        const downloadingMessage = `Starting download for "${fileName}"...`;
+        alert(downloadingMessage);
+        
+        // Try all our blob download methods
+        tryAllBlobDownloadMethods(fileUrl, fileName)
+          .then(success => {
+            if (!success) {
+              console.error('All download methods failed');
+              setCurrentBlob(fileUrl);
+              setCurrentFileName(fileName);
+              setShowBlobModal(true);
+            }
+          })
+          .catch(error => {
+            console.error('Error downloading blob:', error);
+            setCurrentBlob(fileUrl);
+            setCurrentFileName(fileName);
+            setShowBlobModal(true);
+          });
+        
+        return;
+      }
       
-      // Create a temporary anchor element
-      const a = document.createElement('a');
-      a.href = proxyUrl;
-      a.download = fileName || 'download';
-      a.rel = 'noopener noreferrer';
-      a.style.display = 'none';
-      
-      // Add to the DOM
-      document.body.appendChild(a);
-      
-      // Trigger the download
-      a.click();
-      
-      // Clean up
-      setTimeout(() => {
-        document.body.removeChild(a);
-      }, 100);
+      // For regular URLs, use the proxy API
+      const proxyUrl = `/api/download?url=${encodeURIComponent(fileUrl)}&filename=${encodeURIComponent(fileName)}`;
+      window.open(proxyUrl, '_blank');
     } catch (error) {
-      console.error('Error downloading file:', error);
-      // Fallback method - still using the proxy
-      window.open(`/api/download?url=${encodeURIComponent(fileUrl)}&fileName=${encodeURIComponent(fileName)}`, '_blank');
+      console.error('Download error:', error);
+      // Fall back to direct opening
+      window.open(fileUrl, '_blank');
     }
   };
 
@@ -561,6 +578,63 @@ export default function CoursePage({ params }: CoursePageProps) {
           </div>
         </div>
       </div>
+      
+      {/* Blob URL helper modal */}
+      {showBlobModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm p-4">
+          <div className="bg-indigo-900 rounded-xl shadow-xl max-w-lg w-full border border-indigo-700/50 p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-semibold text-white flex items-center">
+                <Info className="h-5 w-5 text-indigo-400 mr-2" />
+                File Access Information
+              </h3>
+              <button 
+                onClick={() => setShowBlobModal(false)}
+                className="text-indigo-300 hover:text-white"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="flex items-start gap-3">
+                <div className="bg-amber-500/20 rounded-full p-2 mt-1">
+                  <AlertTriangle className="h-5 w-5 text-amber-400" />
+                </div>
+                <p className="text-indigo-100">
+                  This file is stored in a special format that can't be downloaded directly due to browser security. 
+                  <strong className="text-white"> {currentFileName}</strong> needs to be accessed differently.
+                </p>
+              </div>
+              
+              <div className="bg-indigo-950/80 p-4 rounded-lg border border-indigo-800/50">
+                <h4 className="font-medium text-white mb-2">Alternative ways to access this file:</h4>
+                <ol className="list-decimal list-inside text-indigo-200 space-y-2">
+                  <li>Return to the course page and try downloading a different file format</li>
+                  <li>Try accessing this course from a different device or browser</li>
+                  <li>Contact your instructor to provide the file in a different format</li>
+                  <li>Check if you can view this content directly on the course platform</li>
+                </ol>
+              </div>
+              
+              <div className="mt-4 p-3 bg-indigo-800/30 rounded-lg">
+                <p className="text-sm text-indigo-300">
+                  <strong className="text-white">Technical note:</strong> Blob URLs from external sources cannot be downloaded directly due to browser security restrictions. This is a limitation of web browsers to protect user security.
+                </p>
+              </div>
+              
+              <div className="flex justify-end gap-3 mt-6">
+                <button
+                  onClick={() => setShowBlobModal(false)}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition-colors"
+                >
+                  Understood
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

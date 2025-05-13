@@ -131,11 +131,17 @@ export default clerkMiddleware(async (auth, req) => {
   // Generate a unique nonce for CSP
   const nonce = Buffer.from(crypto.randomUUID()).toString('base64');
   
-  // Enhanced Content Security Policy
-  response.headers.set(
-    'Content-Security-Policy',
-    `default-src 'self'; script-src 'self' 'nonce-${nonce}' 'unsafe-inline' 'unsafe-eval' https://clerk.epu.edu.iq https://*.clerk.accounts.dev; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: blob:; font-src 'self' data: https:; connect-src 'self' blob: https://*.supabase.co https://*.clerk.accounts.dev https://clerk.epu.edu.iq wss://*.supabase.co https://*.firebase.googleapis.com https://*.firebasestorage.googleapis.com https://firebasestorage.googleapis.com https://*.googleapis.com; frame-src 'self' https://*.clerk.accounts.dev https://clerk.epu.edu.iq; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests;`
-  );
+  // Skip CSP for courses pages to ensure downloads work properly
+  const isCourseRoute = req.nextUrl.pathname.includes('/courses/');
+  
+  // Only set CSP if not on a course route
+  if (!isCourseRoute) {
+    // Enhanced Content Security Policy - must be a single line without line breaks
+    response.headers.set(
+      'Content-Security-Policy',
+      `default-src 'self' blob: data:; script-src 'self' blob: data: 'nonce-${nonce}' 'unsafe-inline' 'unsafe-eval' https://clerk.epu.edu.iq https://*.clerk.accounts.dev; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: blob:; font-src 'self' data: https:; connect-src 'self' blob: data: https://*.supabase.co https://*.clerk.accounts.dev https://clerk.epu.edu.iq wss://*.supabase.co https://*.firebase.googleapis.com https://*.firebasestorage.googleapis.com https://firebasestorage.googleapis.com https://*.googleapis.com; frame-src 'self' https://*.clerk.accounts.dev https://clerk.epu.edu.iq; media-src 'self' blob: data:; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; manifest-src 'self'; upgrade-insecure-requests;`
+    );
+  }
   
   // Enhanced security headers
   response.headers.set('X-XSS-Protection', '1; mode=block');
