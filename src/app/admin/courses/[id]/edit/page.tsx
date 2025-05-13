@@ -764,10 +764,10 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                         
                         {/* Section Content (Files) */}
                         {expandedSections.includes(section.id) && (
-                          <div className="p-3 bg-gray-50 border-t border-gray-200">
+                          <div className="p-3 bg-[#0f0c24] border-t border-indigo-800/30">
                             {/* Files list */}
                             {files.length === 0 ? (
-                              <p className="text-sm text-gray-500 py-2">No files in this section yet.</p>
+                              <p className="text-sm text-indigo-300 py-2">No files in this section yet.</p>
                             ) : (
                               <div className="space-y-2 mb-3">
                                 {files
@@ -775,20 +775,20 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                                   .map(file => (
                                     <div 
                                       key={file.id} 
-                                      className="flex items-center justify-between bg-gray-50 p-2 rounded-md mb-1"
+                                      className="flex items-center justify-between bg-[#131033] p-2 rounded-md mb-1 border border-indigo-900/40"
                                     >
                                       <div className="flex items-center">
-                                        <FileIcon className="h-4 w-4 text-gray-500 mr-2" />
+                                        <FileIcon className="h-4 w-4 text-indigo-300 mr-2" />
                                         <div>
-                                          <div className="text-sm font-medium">{file.title}</div>
-                                          <div className="text-xs text-gray-500">
+                                          <div className="text-sm font-medium text-indigo-100">{file.title}</div>
+                                          <div className="text-xs text-indigo-300">
                                             {file.file_type.toUpperCase()} • {file.file_size}
                                             {file.file_url && (
                                               <a 
                                                 href={file.file_url}
                                                 target="_blank"
                                                 rel="noopener noreferrer" 
-                                                className="ml-2 text-indigo-500 hover:text-indigo-700"
+                                                className="ml-2 text-indigo-400 hover:text-indigo-200"
                                               >
                                                 View
                                               </a>
@@ -799,7 +799,7 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                                       <button
                                         type="button"
                                         onClick={() => handleDeleteFile(file.id)}
-                                        className="p-1 text-gray-400 hover:text-red-500 rounded-full"
+                                        className="p-1 text-indigo-400 hover:text-red-400 rounded-full"
                                         title="Delete file"
                                       >
                                         <Trash2 className="h-4 w-4" />
@@ -811,11 +811,11 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                             
                             {/* Add file form */}
                             {addingFileMode && selectedSectionId === section.id ? (
-                              <div className="bg-white p-3 rounded border border-gray-200">
-                                <h4 className="text-sm font-medium mb-2">Add New File</h4>
+                              <div className="bg-[#0c0a1f] p-3 rounded border border-indigo-800/30">
+                                <h4 className="text-sm font-medium mb-2 text-indigo-100">Add New File</h4>
                                 <div className="space-y-3">
                                   <div>
-                                    <label htmlFor="fileName" className="block text-xs font-medium text-gray-700 mb-1">
+                                    <label htmlFor="fileName" className="block text-xs font-medium text-indigo-300 mb-1">
                                       File Name *
                                     </label>
                                     <input
@@ -823,14 +823,14 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                                       id="fileName"
                                       value={newFileName}
                                       onChange={(e) => setNewFileName(e.target.value)}
-                                      className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                                      className="w-full px-2 py-1 text-sm bg-indigo-800/30 border border-indigo-700/50 rounded text-indigo-100"
                                       placeholder="e.g., Course Syllabus"
                                       required
                                     />
                                   </div>
                                   
                                   <div>
-                                    <label htmlFor="fileUpload" className="block text-xs font-medium text-gray-700 mb-1">
+                                    <label htmlFor="fileUpload" className="block text-xs font-medium text-indigo-300 mb-1">
                                       Upload File
                                     </label>
                                     <input
@@ -838,42 +838,42 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                                       id="fileUpload"
                                       ref={fileInputRef}
                                       onChange={handleFileChange}
-                                      className="w-full px-2 py-1 text-sm text-gray-700 bg-white border border-gray-300 rounded"
+                                      className="w-full px-2 py-1 text-sm text-indigo-300 bg-indigo-800/30 border border-indigo-700/50 rounded file:bg-indigo-700/50 file:text-indigo-100 file:border-none file:rounded file:px-2 file:py-1 file:mr-2 file:cursor-pointer"
                                     />
                                     {fileUpload && (
-                                      <p className="mt-1 text-xs text-green-600">
+                                      <p className="mt-1 text-xs text-green-400">
                                         Ready to upload: {fileUpload.name} ({formatFileSize(fileUpload.size)})
                                       </p>
                                     )}
                                   </div>
                                   
                                   <div>
-                                    <p className="text-xs text-gray-500 mb-1">- OR -</p>
-                                    <label htmlFor="fileUrl" className="block text-xs font-medium text-gray-700 mb-1">
+                                    <p className="text-xs text-indigo-400 mb-1">- OR -</p>
+                                    <label htmlFor="fileUrl" className="block text-xs font-medium text-indigo-300 mb-1">
                                       External Link URL
                                     </label>
                                     <div className="flex items-center">
-                                      <Link2 className="h-4 w-4 text-gray-400 mr-2" />
+                                      <Link2 className="h-4 w-4 text-indigo-400 mr-2" />
                                       <input
                                         type="url"
                                         id="fileUrl"
                                         value={newFileUrl}
                                         onChange={(e) => setNewFileUrl(e.target.value)}
-                                        className="flex-1 px-2 py-1 text-sm border border-gray-300 rounded"
+                                        className="flex-1 px-2 py-1 text-sm bg-indigo-800/30 border border-indigo-700/50 rounded text-indigo-100"
                                         placeholder="https://example.com/file.pdf"
                                       />
                                     </div>
                                   </div>
                                   
                                   <div className="pt-2">
-                                    <label htmlFor="fileType" className="block text-xs font-medium text-gray-700 mb-1">
+                                    <label htmlFor="fileType" className="block text-xs font-medium text-indigo-300 mb-1">
                                       File Type *
                                     </label>
                                     <select
                                       id="fileType"
                                       value={newFileType}
                                       onChange={(e) => setNewFileType(e.target.value)}
-                                      className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                                      className="w-full px-2 py-1 text-sm bg-indigo-800/30 border border-indigo-700/50 rounded text-indigo-100"
                                     >
                                       <option value="pdf">PDF</option>
                                       <option value="docx">Word (DOCX)</option>
@@ -889,7 +889,7 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                                     <button
                                       type="button"
                                       onClick={() => setAddingFileMode(false)}
-                                      className="px-3 py-1 text-xs text-gray-700 hover:bg-gray-100 rounded"
+                                      className="px-3 py-1 text-xs text-indigo-300 hover:bg-indigo-800/50 rounded border border-indigo-700/30"
                                     >
                                       Cancel
                                     </button>
@@ -897,14 +897,9 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                                       type="button"
                                       onClick={handleAddFile}
                                       disabled={submitting}
-                                      className="px-3 py-1 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700 disabled:opacity-50 flex items-center"
+                                      className="px-3 py-1 text-xs bg-indigo-700/50 hover:bg-indigo-600/50 text-white rounded"
                                     >
-                                      {submitting ? 'Adding...' : (
-                                        <>
-                                          <FileUp className="h-3 w-3 mr-1" />
-                                          Add File
-                                        </>
-                                      )}
+                                      {submitting ? 'Adding...' : 'Add File'}
                                     </button>
                                   </div>
                                 </div>
@@ -916,7 +911,7 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                                   setSelectedSectionId(section.id);
                                   setAddingFileMode(true);
                                 }}
-                                className="mt-2 inline-flex items-center text-xs text-indigo-600 hover:text-indigo-800"
+                                className="mt-2 inline-flex items-center text-xs text-indigo-300 hover:text-indigo-100"
                               >
                                 <PlusCircle className="h-3 w-3 mr-1" />
                                 Add File
@@ -932,11 +927,11 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
               
               {/* Add Section div replaces form */}
               {addingSectionMode ? (
-                <div className="bg-white p-4 border border-gray-200 rounded-md mb-4">
-                  <h4 className="text-sm font-medium mb-2">Add New Section</h4>
+                <div className="bg-[#0c0a1f] p-4 border border-indigo-800/30 rounded-md mb-4">
+                  <h4 className="text-sm font-medium mb-2 text-indigo-100">Add New Section</h4>
                   <div className="space-y-3">
                     <div>
-                      <label htmlFor="sectionTitle" className="block text-xs font-medium text-gray-700 mb-1">
+                      <label htmlFor="sectionTitle" className="block text-xs font-medium text-indigo-300 mb-1">
                         Section Title *
                       </label>
                       <input
@@ -944,7 +939,7 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                         id="sectionTitle"
                         value={newSectionTitle}
                         onChange={(e) => setNewSectionTitle(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        className="w-full px-3 py-2 bg-indigo-800/30 border border-indigo-700/50 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-indigo-100"
                         placeholder="e.g., Introduction"
                         required
                       />
@@ -954,7 +949,7 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                       <button
                         type="button"
                         onClick={() => setAddingSectionMode(false)}
-                        className="px-3 py-1 text-sm text-gray-700 hover:bg-gray-100 rounded"
+                        className="px-3 py-1 text-sm text-indigo-300 hover:bg-indigo-800/50 rounded border border-indigo-700/30"
                       >
                         Cancel
                       </button>
@@ -962,7 +957,7 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                         type="button"
                         onClick={handleAddSection}
                         disabled={submitting}
-                        className="px-3 py-1 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700 disabled:opacity-50"
+                        className="px-3 py-1 bg-indigo-700/50 hover:bg-indigo-600/50 text-white text-sm rounded"
                       >
                         {submitting ? 'Adding...' : 'Add Section'}
                       </button>
@@ -973,7 +968,7 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                 <button 
                   type="button"
                   onClick={() => setAddingSectionMode(true)}
-                  className="inline-flex items-center text-sm text-indigo-600 hover:text-indigo-800"
+                  className="inline-flex items-center text-sm text-indigo-300 hover:text-indigo-100"
                 >
                   <PlusCircle className="h-4 w-4 mr-1" />
                   Add Section
@@ -984,7 +979,7 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
             <div className="pt-4 flex justify-end space-x-3">
               <Link
                 href="/admin/courses"
-                className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                className="px-4 py-2 border border-indigo-800/30 rounded-md text-indigo-300 hover:bg-indigo-800/30"
               >
                 Cancel
               </Link>
@@ -992,7 +987,7 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                 type="button"
                 onClick={handleSubmit}
                 disabled={submitting}
-                className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50"
+                className="px-4 py-2 bg-indigo-700/50 hover:bg-indigo-600/50 text-white rounded-md"
               >
                 {submitting ? 'Saving...' : 'Save Changes'}
               </button>
@@ -1004,16 +999,16 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
       {/* Delete confirmation modal */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Confirm Deletion</h3>
-            <p className="text-gray-600 mb-6">
+          <div className="bg-[#0c0a1f] rounded-lg shadow-xl p-6 max-w-md w-full border border-indigo-800/30">
+            <h3 className="text-lg font-medium text-indigo-100 mb-4">Confirm Deletion</h3>
+            <p className="text-indigo-300 mb-6">
               Are you sure you want to delete this section and all its files? This action cannot be undone.
             </p>
             <div className="flex justify-end space-x-3">
               <button
                 type="button"
                 onClick={cancelDeleteSection}
-                className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                className="px-4 py-2 border border-indigo-800/30 rounded-md text-indigo-300 hover:bg-indigo-800/30"
                 disabled={submitting}
               >
                 Cancel
@@ -1021,7 +1016,7 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
               <button
                 type="button"
                 onClick={handleDeleteSection}
-                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50"
+                className="px-4 py-2 bg-red-900/50 text-white rounded-md hover:bg-red-800/50 disabled:opacity-50"
                 disabled={submitting}
               >
                 {submitting ? 'Deleting...' : 'Delete Section'}
