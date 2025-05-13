@@ -177,6 +177,52 @@ export type PresentationGroupMember = {
   joined_at: string;
 };
 
+/**
+ * Check if a user has admin privileges (case-insensitive)
+ * @param userRole The role to check
+ * @returns True if the user is an admin
+ */
+export function isAdminRole(userRole?: string | null): boolean {
+  if (!userRole) return false;
+  const normalizedRole = userRole.toLowerCase().trim();
+  return normalizedRole === 'admin';
+}
+
+/**
+ * Compare two email domains with robust handling of edge cases
+ * @param email1 First email address
+ * @param email2 Second email address
+ * @param fuzzyMatch If true, only checks if domains contain the same text (more lenient)
+ * @returns True if the domains match according to the selected comparison mode
+ */
+export function compareEmailDomains(email1?: string | null, email2?: string | null, fuzzyMatch: boolean = false): boolean {
+  // Handle null/undefined cases
+  if (!email1 || !email2) return false;
+  
+  // Normalize both emails: trim, lowercase
+  const normalizedEmail1 = email1.toLowerCase().trim();
+  const normalizedEmail2 = email2.toLowerCase().trim();
+  
+  // Extract domains
+  const parts1 = normalizedEmail1.split('@');
+  const parts2 = normalizedEmail2.split('@');
+  
+  // Validate that both emails have proper format
+  if (parts1.length !== 2 || parts2.length !== 2) return false;
+  
+  const domain1 = parts1[1];
+  const domain2 = parts2[1];
+  
+  // Strict comparison (default)
+  if (!fuzzyMatch) {
+    return domain1 === domain2;
+  }
+  
+  // Fuzzy comparison - check if domains contain the same text
+  // This handles subdomains and other variations
+  return domain1.includes(domain2) || domain2.includes(domain1);
+}
+
 // Function to get user data from Supabase
 export async function getUserData(clerkId: string): Promise<UserData | null> {
   try {

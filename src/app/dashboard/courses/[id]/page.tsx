@@ -148,6 +148,38 @@ export default function CoursePage({ params }: CoursePageProps) {
     setIsSaved(!isSaved);
   };
 
+  // Add a function to handle file downloads correctly
+  const handleFileDownload = (fileUrl: string, fileName: string) => {
+    if (!fileUrl) return;
+    
+    try {
+      // Instead of directly using the file URL, use our proxy endpoint
+      const proxyUrl = `/api/download?url=${encodeURIComponent(fileUrl)}&fileName=${encodeURIComponent(fileName)}`;
+      
+      // Create a temporary anchor element
+      const a = document.createElement('a');
+      a.href = proxyUrl;
+      a.download = fileName || 'download';
+      a.rel = 'noopener noreferrer';
+      a.style.display = 'none';
+      
+      // Add to the DOM
+      document.body.appendChild(a);
+      
+      // Trigger the download
+      a.click();
+      
+      // Clean up
+      setTimeout(() => {
+        document.body.removeChild(a);
+      }, 100);
+    } catch (error) {
+      console.error('Error downloading file:', error);
+      // Fallback method - still using the proxy
+      window.open(`/api/download?url=${encodeURIComponent(fileUrl)}&fileName=${encodeURIComponent(fileName)}`, '_blank');
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-indigo-950 to-[#0f0b1e] flex items-center justify-center">
@@ -409,15 +441,13 @@ export default function CoursePage({ params }: CoursePageProps) {
                                           </div>
                                         </div>
                                         {file.file_url && (
-                                          <a 
-                                            href={file.file_url} 
-                                            target="_blank"
-                                            rel="noopener noreferrer"
+                                          <button 
+                                            onClick={() => handleFileDownload(file.file_url, file.title)}
                                             className="ml-2 p-2 hover:bg-indigo-700/50 rounded-full transition-colors"
                                             title="Download File"
                                           >
                                             <Download className="h-5 w-5 text-indigo-300" />
-                                          </a>
+                                          </button>
                                         )}
                                       </motion.div>
                                     );
@@ -500,12 +530,10 @@ export default function CoursePage({ params }: CoursePageProps) {
                   {files
                     .slice(0, showAllResources ? undefined : 3)
                     .map((file: CourseFile) => (
-                      <a 
+                      <button 
                         key={file.id} 
-                        href={file.file_url || '#'} 
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center p-3 bg-indigo-950/50 hover:bg-indigo-800/30 border border-indigo-800/30 hover:border-indigo-700/50 rounded-xl transition-all group"
+                        onClick={() => file.file_url && handleFileDownload(file.file_url, file.title)}
+                        className="flex items-center p-3 w-full text-left bg-indigo-950/50 hover:bg-indigo-800/30 border border-indigo-800/30 hover:border-indigo-700/50 rounded-xl transition-all group"
                       >
                         <div className="h-8 w-8 rounded-md bg-indigo-700/30 flex items-center justify-center text-indigo-300 mr-3">
                           {getFileIcon(file.file_type)}
@@ -514,7 +542,8 @@ export default function CoursePage({ params }: CoursePageProps) {
                           <div className="font-medium text-white group-hover:text-indigo-200 transition-colors">{file.title}</div>
                           <div className="text-xs text-indigo-400">{file.file_type.toUpperCase()}</div>
                         </div>
-                      </a>
+                        <Download className="h-4 w-4 text-indigo-300 opacity-70 group-hover:opacity-100" />
+                      </button>
                     ))}
                   
                   {/* Show more button if there are more than 3 resources */}
