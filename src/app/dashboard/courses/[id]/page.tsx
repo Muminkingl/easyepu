@@ -197,43 +197,43 @@ export default function CoursePage({ params }: CoursePageProps) {
 
     // Special handling for blob URLs in production
     if (isProduction && fileUrl.startsWith('blob:')) {
-      // Register the blob URL with our API
-      fetch('/api/blob-download', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          blobUrl: fileUrl,
-          filename: fileName
-        }),
-      })
-      .then(response => response.json())
-      .then(data => {
-        if (data.success && data.downloadUrl) {
-          // Open the download URL in a new tab
-          window.open(data.downloadUrl, '_blank');
+      // For blob URLs, we need to fetch the actual data and send it
+      fetch(fileUrl)
+        .then(response => response.blob())
+        .then(blob => {
+          // Create a FormData object to send the blob
+          const formData = new FormData();
+          formData.append('file', blob, fileName);
           
-          // Show preview for compatible file types
-          const fileType = determineFileType(fileName);
-          if (['image', 'video', 'audio', 'pdf'].includes(fileType)) {
-            setFileViewerUrl(fileUrl);
-            setFileViewerName(fileName);
-            setFileViewerType(fileType);
-            setShowFileViewer(true);
+          // Use the download API to handle the blob data
+          return fetch('/api/download', {
+            method: 'POST',
+            body: formData
+          });
+        })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success && data.downloadUrl) {
+            // Open the download URL in a new tab
+            window.open(data.downloadUrl, '_blank');
+            
+            // Show preview for compatible file types
+            const fileType = determineFileType(fileName);
+            if (['image', 'video', 'audio', 'pdf'].includes(fileType)) {
+              setFileViewerUrl(fileUrl);
+              setFileViewerName(fileName);
+              setFileViewerType(fileType);
+              setShowFileViewer(true);
+            }
+          } else {
+            console.error('Failed to process file download:', data.error);
+            alert('Failed to download file. Please try again.');
           }
-        } else {
-          console.error('Failed to register blob URL:', data.error);
-          alert('Failed to download file. Please try again.');
-        }
-      })
-      .catch(error => {
-        console.error('Error registering blob URL:', error);
-        
-        // Fallback to proxy download API
-        const proxyUrl = `/api/download?url=${encodeURIComponent(fileUrl)}&filename=${encodeURIComponent(fileName)}`;
-        window.open(proxyUrl, '_blank');
-      });
+        })
+        .catch(error => {
+          console.error('Error processing file download:', error);
+          alert('Failed to download file. Please try again later.');
+        });
       
       return;
     }
@@ -848,30 +848,33 @@ export default function CoursePage({ params }: CoursePageProps) {
                           const isProduction = typeof window !== 'undefined' && window.location.hostname !== 'localhost';
                           
                           if (isProduction && fileViewerUrl.startsWith('blob:')) {
-                            // Use the blob-download API for production environment
-                            fetch('/api/blob-download', {
-                              method: 'POST',
-                              headers: {
-                                'Content-Type': 'application/json',
-                              },
-                              body: JSON.stringify({
-                                blobUrl: fileViewerUrl,
-                                filename: fileViewerName || 'download'
-                              }),
-                            })
-                            .then(response => response.json())
-                            .then(data => {
-                              if (data.success && data.downloadUrl) {
-                                window.open(data.downloadUrl, '_blank');
-                              } else {
-                                console.error('Failed to register blob URL:', data.error);
-                                alert('Failed to download file. Please try again.');
-                              }
-                            })
-                            .catch(error => {
-                              console.error('Error registering blob URL:', error);
-                              alert('Download failed. Please try again later.');
-                            });
+                            // For blob URLs in production, fetch the actual data
+                            fetch(fileViewerUrl)
+                              .then(response => response.blob())
+                              .then(blob => {
+                                // Create a FormData object to send the blob
+                                const formData = new FormData();
+                                formData.append('file', blob, fileViewerName || 'download');
+                                
+                                // Use the download API to handle the blob data
+                                return fetch('/api/download', {
+                                  method: 'POST',
+                                  body: formData
+                                });
+                              })
+                              .then(response => response.json())
+                              .then(data => {
+                                if (data.success && data.downloadUrl) {
+                                  window.open(data.downloadUrl, '_blank');
+                                } else {
+                                  console.error('Failed to process file download:', data.error);
+                                  alert('Failed to download file. Please try again.');
+                                }
+                              })
+                              .catch(error => {
+                                console.error('Error processing file download:', error);
+                                alert('Failed to download file. Please try again later.');
+                              });
                           } else {
                             // Regular download for non-blob URLs or local development
                             const a = document.createElement('a');
