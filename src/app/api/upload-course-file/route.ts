@@ -7,14 +7,37 @@ export async function POST(request: Request) {
   try {
     const formData = await request.formData();
     
-    // Get file and userId, courseId from form data
-    const file = formData.get('file') as File;
+    // Get data from form data
     const userId = formData.get('userId') as string;
     const courseId = formData.get('courseId') as string;
     
-    if (!file || !userId || !courseId) {
+    // Check if this is a Google Drive link submission
+    const isExternalLink = formData.get('isExternalLink') === 'true';
+    const driveUrl = formData.get('driveUrl') as string;
+    const driveLinkFileName = formData.get('fileName') as string;
+    
+    // The standard file upload
+    const file = formData.get('file') as File | null;
+    
+    if (!userId || !courseId) {
       return NextResponse.json(
         { success: false, error: 'Missing required parameters' },
+        { status: 400 }
+      );
+    }
+    
+    // For Google Drive links, we need a URL and filename
+    if (isExternalLink && (!driveUrl || !driveLinkFileName)) {
+      return NextResponse.json(
+        { success: false, error: 'Missing Google Drive link or filename' },
+        { status: 400 }
+      );
+    }
+    
+    // For file uploads, we need a file
+    if (!isExternalLink && !file) {
+      return NextResponse.json(
+        { success: false, error: 'Missing file for upload' },
         { status: 400 }
       );
     }
@@ -65,7 +88,8 @@ export async function POST(request: Request) {
     const existingFileData = await getCourseFile(courseId);
     
     // If an existing file is found, delete it before uploading the new one
-    if (existingFileData && existingFileData.url) {
+    // But only if it's not a Google Drive link
+    if (existingFileData && existingFileData.url && !existingFileData.url.includes('drive.google.com')) {
       try {
         await deleteCourseFileFromStorage(existingFileData.url);
       } catch (deleteError) {
@@ -73,27 +97,42 @@ export async function POST(request: Request) {
         // Continue with upload even if delete fails
       }
     }
-      
-    // Upload file to Vercel Blob Storage
-    const fileUrl = await uploadCourseFile(file, courseId);
     
-    if (!fileUrl) {
-      return NextResponse.json(
-        { success: false, error: 'Failed to upload file to Vercel Blob storage' },
-        { status: 500 }
-      );
+    let fileUrl = '';
+    let fileName = '';
+    
+    // Handle Google Drive link
+    if (isExternalLink) {
+      fileUrl = driveUrl;
+      fileName = driveLinkFileName;
+    } 
+    // Handle file upload 
+    else if (file) {
+      // Upload file to Vercel Blob Storage
+      fileUrl = await uploadCourseFile(file, courseId);
+      
+      if (!fileUrl) {
+        return NextResponse.json(
+          { success: false, error: 'Failed to upload file to Vercel Blob storage' },
+          { status: 500 }
+        );
+      }
+      
+      fileName = file.name;
     }
     
-    // Update the database with the file URL
-    const success = await updateCourseFile(courseId, fileUrl, file.name);
+    // Update the database with the file URL or Drive link
+    const success = await updateCourseFile(courseId, fileUrl, fileName);
     
     if (!success) {
       console.error('Failed to update database with course file information');
-      // If database update fails, try to delete the uploaded file to avoid orphaned files
-      try {
-        await deleteCourseFileFromStorage(fileUrl);
-      } catch (cleanupError) {
-        console.error('Failed to clean up file after database error:', cleanupError);
+      // If database update fails and we uploaded a file (not a Drive link), try to delete it
+      if (!isExternalLink && fileUrl) {
+        try {
+          await deleteCourseFileFromStorage(fileUrl);
+        } catch (cleanupError) {
+          console.error('Failed to clean up file after database error:', cleanupError);
+        }
       }
       
       return NextResponse.json(
@@ -105,7 +144,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       fileUrl: fileUrl,
-      fileName: file.name
+      fileName: fileName
     });
     
   } catch (error) {

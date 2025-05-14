@@ -29,7 +29,8 @@ import {
   Maximize2,
   Minimize2,
   FileText,
-  Eye
+  Eye,
+  LinkIcon
 } from 'lucide-react';
 import { Course, CourseSection, CourseFile } from '@/lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -402,6 +403,20 @@ export default function CoursePage({ params }: CoursePageProps) {
     fetchCourseFile();
   }, [courseId]);
 
+  // Function to safely open a file link
+  const handleFileClick = (fileUrl: string, fileName: string) => {
+    if (!fileUrl) return;
+    
+    // If it's a Google Drive link, just open it directly
+    if (fileUrl.includes('drive.google.com')) {
+      window.open(fileUrl, '_blank');
+      return;
+    }
+    
+    // For all other files, use the existing method which might handle blob URLs
+    handleFileAction(fileUrl, fileName);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-indigo-950 to-[#0f0b1e] flex items-center justify-center">
@@ -652,32 +667,35 @@ export default function CoursePage({ params }: CoursePageProps) {
                                         transition={{ duration: 0.2 }}
                                       >
                                         <div className="flex-shrink-0 mr-4 flex items-center justify-center h-10 w-10 rounded-lg bg-indigo-700/30 text-indigo-300 text-lg">
-                                          {getFileIcon(file.file_type)}
+                                          {file.file_url?.includes('drive.google.com') ? '🔗' : getFileIcon(file.file_type)}
                                         </div>
                                         <div className="flex-grow">
                                           <div className="font-medium text-white">{file.title}</div>
                                           <div className="text-xs text-indigo-300 flex items-center mt-1">
-                                            <span className="uppercase font-medium text-indigo-300 bg-indigo-700/30 px-2 py-0.5 rounded-full text-xs">{file.file_type}</span>
+                                            <span className="uppercase font-medium text-indigo-300 bg-indigo-700/30 px-2 py-0.5 rounded-full text-xs">
+                                              {file.file_url?.includes('drive.google.com') ? 'Google Drive' : file.file_type}
+                                            </span>
                                             <span className="mx-2">•</span>
-                                            <span>{file.file_size}</span>
+                                            <span>{file.file_url?.includes('drive.google.com') ? 'External Link' : file.file_size}</span>
                                           </div>
                                         </div>
                                         {file.file_url && (
-                                          <div className="flex">
-                                            <button 
-                                              onClick={(e) => {
-                                                e.preventDefault();
-                                                e.stopPropagation();
-                                                if (file.file_url) {
-                                                  handleFileAction(file.file_url, file.title);
-                                                }
-                                              }}
-                                              className="ml-2 p-2 hover:bg-indigo-700/50 rounded-full transition-colors"
-                                              title="Download File"
-                                            >
+                                          <button 
+                                            onClick={(e) => {
+                                              e.preventDefault();
+                                              e.stopPropagation();
+                                              if (file.file_url) {
+                                                handleFileClick(file.file_url, file.title);
+                                              }
+                                            }}
+                                            className="ml-2 p-2 hover:bg-indigo-700/50 rounded-full transition-colors"
+                                            title="Open File"
+                                          >
+                                            {file.file_url.includes('drive.google.com') ? 
+                                              <ExternalLink className="h-5 w-5 text-indigo-300" /> : 
                                               <Download className="h-5 w-5 text-indigo-300" />
-                                            </button>
-                                          </div>
+                                            }
+                                          </button>
                                         )}
                                       </motion.div>
                                     );
@@ -766,7 +784,7 @@ export default function CoursePage({ params }: CoursePageProps) {
                           e.preventDefault();
                           e.stopPropagation();
                           if (file.file_url) {
-                            handleFileAction(file.file_url, file.title);
+                            handleFileClick(file.file_url, file.title);
                           }
                         }}
                         className="flex items-center p-3 w-full text-left bg-indigo-950/50 hover:bg-indigo-800/30 border border-indigo-800/30 hover:border-indigo-700/50 rounded-xl transition-all group"
@@ -815,7 +833,10 @@ export default function CoursePage({ params }: CoursePageProps) {
           <div className="p-6">
             <div className="p-4 bg-indigo-800/30 rounded-lg border border-indigo-700/30">
               <div className="flex items-center mb-3">
-                <Download className="h-6 w-6 mr-3 text-indigo-300" />
+                {courseMaterialFile.url.includes('drive.google.com') ? 
+                  <LinkIcon className="h-6 w-6 mr-3 text-indigo-300" /> :
+                  <Download className="h-6 w-6 mr-3 text-indigo-300" />
+                }
                 <div className="text-indigo-200 font-medium">
                   {courseMaterialFile.name}
                 </div>
@@ -828,18 +849,25 @@ export default function CoursePage({ params }: CoursePageProps) {
                   rel="noopener noreferrer"
                   className="inline-flex items-center px-3 py-2 text-sm bg-blue-700/50 text-white font-medium rounded hover:bg-blue-600/50 border border-blue-600/30 transition-colors"
                 >
-                  <Download className="h-4 w-4 mr-1.5" />
-                  {t('courseDetails.viewFile')}
+                  {courseMaterialFile.url.includes('drive.google.com') ? 
+                    <ExternalLink className="h-4 w-4 mr-1.5" /> :
+                    <Eye className="h-4 w-4 mr-1.5" />
+                  }
+                  {courseMaterialFile.url.includes('drive.google.com') ? 
+                    t('courseDetails.openInDrive') : 
+                    t('courseDetails.viewFile')}
                 </a>
                 
-                <a
-                  href={courseMaterialFile.url}
-                  download
-                  className="inline-flex items-center px-3 py-2 text-sm bg-indigo-700/50 text-white font-medium rounded hover:bg-indigo-600/50 border border-indigo-600/30 transition-colors"
-                >
-                  <Download className="h-4 w-4 mr-1.5" />
-                  {t('courseDetails.downloadFile')}
-                </a>
+                {!courseMaterialFile.url.includes('drive.google.com') && (
+                  <a
+                    href={courseMaterialFile.url}
+                    download
+                    className="inline-flex items-center px-3 py-2 text-sm bg-indigo-700/50 text-white font-medium rounded hover:bg-indigo-600/50 border border-indigo-600/30 transition-colors"
+                  >
+                    <Download className="h-4 w-4 mr-1.5" />
+                    {t('courseDetails.downloadFile')}
+                  </a>
+                )}
               </div>
             </div>
           </div>

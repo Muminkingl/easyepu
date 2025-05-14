@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ChevronLeft, AlertTriangle, Loader2, BookOpen, Palette, PencilIcon, Eye, EyeOff, Upload, FileIcon, CheckCircle, XCircle, Download } from 'lucide-react';
+import { ChevronLeft, AlertTriangle, Loader2, BookOpen, Palette, PencilIcon, Eye, EyeOff, Upload, FileIcon, CheckCircle, XCircle, Download, LinkIcon } from 'lucide-react';
 import { getCourseById } from '@/lib/supabase';
 import { useUserRole } from '@/hooks/useUserRole';
 import { getCourseFileAction } from '@/lib/actions';
@@ -15,6 +15,134 @@ interface CoursePageProps {
     id: string;
   };
 }
+
+// Add a Google Drive link component
+const GoogleDriveLinkForm = ({ courseId, onSuccess, onCancel }: { courseId: string, onSuccess: () => void, onCancel: () => void }) => {
+  const [driveLinkUrl, setDriveLinkUrl] = useState('');
+  const [fileName, setFileName] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const { user } = useUser();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!driveLinkUrl.trim()) {
+      setError('Please enter a valid Google Drive link');
+      return;
+    }
+    
+    if (!fileName.trim()) {
+      setError('Please enter a file name');
+      return;
+    }
+    
+    if (!user) {
+      setError('You must be logged in');
+      return;
+    }
+    
+    setSubmitting(true);
+    setError('');
+    
+    try {
+      // Create FormData for the API call
+      const formData = new FormData();
+      formData.append('userId', user.id);
+      formData.append('courseId', courseId);
+      formData.append('driveUrl', driveLinkUrl);
+      formData.append('fileName', fileName);
+      formData.append('isExternalLink', 'true');
+      
+      // Use the existing endpoint but with link data
+      const response = await fetch('/api/upload-course-file', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        onSuccess();
+      } else {
+        setError(result.error || 'Failed to save Google Drive link.');
+      }
+    } catch (error) {
+      console.error('Error saving Google Drive link:', error);
+      setError('An error occurred while saving the link.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+  
+  return (
+    <div className="p-4 bg-indigo-900/20 rounded-lg border border-indigo-800/30">
+      <h3 className="text-lg font-medium text-white mb-4 flex items-center">
+        <LinkIcon className="h-5 w-5 text-indigo-400 mr-2" />
+        Add Google Drive Link
+      </h3>
+      
+      {error && (
+        <div className="p-3 bg-red-900/30 border border-red-800/40 rounded-md mb-4">
+          <p className="text-red-200 text-sm">{error}</p>
+        </div>
+      )}
+      
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label htmlFor="fileName" className="block text-sm font-medium text-indigo-300 mb-1">
+            File Name *
+          </label>
+          <input
+            type="text"
+            id="fileName"
+            value={fileName}
+            onChange={(e) => setFileName(e.target.value)}
+            className="w-full px-3 py-2 bg-indigo-800/30 border border-indigo-700/50 rounded-md text-white"
+            placeholder="e.g., Course Syllabus"
+            required
+          />
+        </div>
+        
+        <div>
+          <label htmlFor="driveLink" className="block text-sm font-medium text-indigo-300 mb-1">
+            Google Drive Link *
+          </label>
+          <input
+            type="url"
+            id="driveLink"
+            value={driveLinkUrl}
+            onChange={(e) => setDriveLinkUrl(e.target.value)}
+            className="w-full px-3 py-2 bg-indigo-800/30 border border-indigo-700/50 rounded-md text-white"
+            placeholder="https://drive.google.com/file/d/..."
+            required
+          />
+          <p className="mt-1 text-xs text-indigo-400">
+            Paste a shareable Google Drive link (make sure it's set to "Anyone with the link can view")
+          </p>
+        </div>
+        
+        <div className="flex gap-3">
+          <button
+            type="submit"
+            disabled={submitting}
+            className="px-4 py-2 bg-indigo-700 hover:bg-indigo-600 text-white rounded-md flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {submitting ? 'Saving...' : 'Save Link'}
+          </button>
+          
+          <button
+            type="button"
+            onClick={onCancel}
+            className="px-4 py-2 bg-indigo-900/40 hover:bg-indigo-800/40 text-indigo-300 rounded-md"
+          >
+            Cancel
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+};
 
 export default function CoursePage({ params }: CoursePageProps) {
   const router = useRouter();
@@ -28,6 +156,7 @@ export default function CoursePage({ params }: CoursePageProps) {
   const [fileUploadError, setFileUploadError] = useState('');
   const [fileUploadSuccess, setFileUploadSuccess] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showDriveLinkForm, setShowDriveLinkForm] = useState(false);
   
   // Unwrap params with React.use()
   const unwrappedParams = React.use(params as any);
@@ -134,6 +263,24 @@ export default function CoursePage({ params }: CoursePageProps) {
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
+    }
+  };
+
+  // Add this function to handle successful link submission
+  const handleDriveLinkSuccess = async () => {
+    setShowDriveLinkForm(false);
+    setFileUploadSuccess('Google Drive link saved successfully!');
+    
+    // Reload the course data to ensure we have the latest info
+    const updatedCourse = await getCourseById(courseId);
+    if (updatedCourse) {
+      setCourse(updatedCourse);
+    }
+    
+    // Update the course file state
+    const courseFileData = await getCourseFileAction(courseId);
+    if (courseFileData) {
+      setCourseFile(courseFileData);
     }
   };
 
@@ -307,22 +454,18 @@ export default function CoursePage({ params }: CoursePageProps) {
               )}
               
               {courseFile ? (
-                <div className="mb-4 p-4 bg-indigo-800/30 rounded-lg border border-indigo-700/30">
-                  <div className="flex justify-between items-center">
-                    <h4 className="text-sm font-medium text-indigo-200 mb-2">Uploaded File</h4>
-                    <div className="px-2 py-0.5 bg-green-600/30 rounded text-xs text-green-300 flex items-center">
-                      <CheckCircle className="h-3 w-3 mr-1" />
-                      Available
+                <div className="mb-4">
+                  <div className="p-4 bg-indigo-800/30 rounded-lg border border-indigo-700">
+                    <div className="flex items-center">
+                      <FileIcon className="h-6 w-6 text-indigo-400 mr-3" />
+                      <div>
+                        <div className="font-medium text-white">{courseFile.name}</div>
+                        <div className="text-xs text-indigo-300">
+                          {courseFile.url.includes('drive.google.com') ? 'Google Drive Link' : 'Uploaded File'}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                  
-                  <div className="flex items-center">
-                    <FileIcon className="h-5 w-5 mr-2 text-indigo-300 flex-shrink-0" />
-                    <div className="text-indigo-300 text-sm truncate mr-2">
-                      {courseFile.name}
-                    </div>
-                  </div>
-                  
+                    
                   <div className="mt-3 flex space-x-2">
                     <a 
                       href={courseFile.url} 
@@ -335,11 +478,13 @@ export default function CoursePage({ params }: CoursePageProps) {
                     </a>
                     <a
                       href={courseFile.url}
-                      download
+                      download={!courseFile.url.includes('drive.google.com')}
+                      target="_blank"
+                      rel="noopener noreferrer"
                       className="inline-flex items-center px-3 py-1.5 text-xs bg-indigo-700/50 text-white font-medium rounded hover:bg-indigo-600/50 border border-indigo-600/30"
                     >
                       <Download className="h-3 w-3 mr-1" />
-                      Download
+                      {courseFile.url.includes('drive.google.com') ? 'Open' : 'Download'}
                     </a>
                     <label
                       className="inline-flex items-center px-3 py-1.5 text-xs bg-amber-700/50 text-white font-medium rounded hover:bg-amber-600/50 border border-amber-600/30 cursor-pointer"
@@ -358,25 +503,45 @@ export default function CoursePage({ params }: CoursePageProps) {
                 </div>
               ) : (
                 <div className="mb-4">
-                  <div className="p-4 bg-indigo-800/30 rounded-lg border border-dashed border-indigo-700 text-center">
-                    <FileIcon className="h-8 w-8 mx-auto mb-2 text-indigo-400" />
-                    <p className="text-indigo-300 text-sm mb-3">No file uploaded yet</p>
-                    <label className="inline-flex items-center px-4 py-2 bg-indigo-700/50 text-white font-medium rounded-lg hover:bg-indigo-600/50 border border-indigo-600/30 cursor-pointer transition-colors">
-                      <Upload className="h-4 w-4 mr-2" />
-                      {uploadingFile ? 'Uploading...' : 'Upload Course Materials'}
-                      <input
-                        type="file"
-                        ref={fileInputRef}
-                        onChange={handleFileUpload}
-                        className="hidden"
-                        accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx"
-                        disabled={uploadingFile}
-                      />
-                    </label>
-                    <p className="mt-2 text-xs text-indigo-400">
-                      Supported formats: PDF, DOC, DOCX, PPT, PPTX, XLS, XLSX (Max 10MB)
-                    </p>
-                  </div>
+                  {showDriveLinkForm ? (
+                    <GoogleDriveLinkForm 
+                      courseId={courseId} 
+                      onSuccess={handleDriveLinkSuccess}
+                      onCancel={() => setShowDriveLinkForm(false)} 
+                    />
+                  ) : (
+                    <div className="p-4 bg-indigo-800/30 rounded-lg border border-dashed border-indigo-700 text-center">
+                      <FileIcon className="h-8 w-8 mx-auto mb-2 text-indigo-400" />
+                      <p className="text-indigo-300 text-sm mb-3">No file uploaded yet</p>
+                      
+                      <div className="flex flex-col sm:flex-row gap-2 justify-center">
+                        <label className="inline-flex items-center px-4 py-2 bg-indigo-700/50 text-white font-medium rounded-lg hover:bg-indigo-600/50 border border-indigo-600/30 cursor-pointer transition-colors">
+                          <Upload className="h-4 w-4 mr-2" />
+                          {uploadingFile ? 'Uploading...' : 'Upload Course Materials'}
+                          <input
+                            type="file"
+                            ref={fileInputRef}
+                            onChange={handleFileUpload}
+                            className="hidden"
+                            accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx"
+                            disabled={uploadingFile}
+                          />
+                        </label>
+                        
+                        <button
+                          onClick={() => setShowDriveLinkForm(true)}
+                          className="inline-flex items-center px-4 py-2 bg-blue-700/50 text-white font-medium rounded-lg hover:bg-blue-600/50 border border-blue-600/30 transition-colors"
+                        >
+                          <LinkIcon className="h-4 w-4 mr-2" />
+                          Add Google Drive Link
+                        </button>
+                      </div>
+                      
+                      <p className="mt-2 text-xs text-indigo-400">
+                        Supported formats: PDF, DOC, DOCX, PPT, PPTX, XLS, XLSX (Max 10MB)
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
