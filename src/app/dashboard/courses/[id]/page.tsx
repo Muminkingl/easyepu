@@ -338,9 +338,38 @@ export default function CoursePage({ params }: CoursePageProps) {
     const isIOSDevice = isIOS();
     console.log(`Is iOS device: ${isIOSDevice}`);
 
-    // For all files, just open in a new tab - no more iframe or blob URL issues
+    // For PDFs on iOS, we need a special approach
+    if (fileType === 'pdf' && isIOSDevice) {
+      console.log('Opening PDF in viewer for iOS');
+      // For iOS, always use the viewer to avoid blob URL issues
+      setFileViewerUrl(fileUrl);
+      setFileViewerName(fileName.includes('.pdf') ? fileName : `${fileName}.pdf`);
+      setFileViewerType('pdf');
+      setShowFileViewer(true);
+      return;
+    }
+
+    // For all other files, just open in a new tab
     console.log('Opening file in new tab:', fileUrl);
     window.open(fileUrl, '_blank');
+  };
+
+  // Function to convert vercel blob URLs to a more iOS-friendly format
+  const getIOSFriendlyURL = (url: string): string => {
+    if (!url) return '';
+    
+    // If it's a Vercel Blob URL, get the underlying storage URL
+    if (url.includes('vercel-blob.com') || url.includes('blob.vercel.app')) {
+      // Try to extract the real URL
+      const urlParts = url.split('/');
+      // Find the filename part
+      const filenamePart = urlParts[urlParts.length - 1].split('?')[0];
+      
+      // Try to create a more mobile-friendly direct URL
+      return `https://easyepu.vercel.app/api/pdf-proxy?file=${encodeURIComponent(url)}`;
+    }
+    
+    return url;
   };
 
   // Function to create a download link with proper content-disposition
@@ -855,50 +884,102 @@ export default function CoursePage({ params }: CoursePageProps) {
             <div className={`w-full ${isFullscreen ? 'h-[calc(100vh-56px)]' : 'h-[60vh]'} bg-gray-900/50`}>
               {fileViewerType === 'pdf' && (
                 <div className="w-full h-full flex flex-col items-center justify-center p-6 bg-indigo-950/70">
-                  {/* Simple PDF download instructions instead of viewer */}
-                  <div className="max-w-md mx-auto text-center bg-indigo-900/60 p-8 rounded-xl border border-indigo-700/40 shadow-lg">
-                    <div className="mb-6 bg-indigo-800/30 p-4 rounded-full inline-flex">
-                      <FileText className="h-12 w-12 text-indigo-300" />
-                    </div>
-                    
-                    <h3 className="text-xl font-semibold text-white mb-3">
-                      {fileViewerName || "PDF Document"}
-                    </h3>
-                    
-                    <p className="text-indigo-200 mb-6">
-                      For security reasons, this PDF can't be viewed directly in this page. 
-                      Please use one of the options below to view the document.
-                    </p>
-                    
-                    <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                      <button
-                        className="px-4 py-3 bg-indigo-700 hover:bg-indigo-600 rounded-lg text-white flex items-center justify-center gap-2"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          window.open(fileViewerUrl, '_blank');
-                        }}
-                      >
-                        <ExternalLink className="h-4 w-4 mr-1" />
-                        Open in New Tab
-                      </button>
-                      
-                      <button
-                        className="px-4 py-3 bg-indigo-800/50 hover:bg-indigo-700/50 rounded-lg text-white flex items-center justify-center gap-2"
-                        onClick={() => setShowFileViewer(false)}
-                      >
-                        Close
-                      </button>
-                    </div>
-                    
-                    {isIOS() && (
-                      <div className="mt-6 p-3 bg-blue-900/30 border border-blue-700/20 rounded-lg">
-                        <p className="text-blue-200 text-sm">
-                          <span className="font-medium">iOS tip:</span> After opening, tap the share icon and select "Save to Files" to download.
-                        </p>
+                  {/* For iOS, we need a special approach */}
+                  {isIOS() ? (
+                    <div className="max-w-lg w-full mx-auto bg-indigo-900/60 p-6 rounded-xl border border-indigo-700/40 shadow-lg">
+                      <div className="mb-4 flex justify-center">
+                        <FileText className="h-10 w-10 text-indigo-300" />
                       </div>
-                    )}
-                  </div>
+                      
+                      <h3 className="text-xl font-semibold text-white mb-3 text-center">
+                        {fileViewerName || "PDF Document"}
+                      </h3>
+                      
+                      <div className="space-y-4">
+                        <div className="p-4 bg-indigo-800/30 rounded-lg">
+                          <p className="text-indigo-200 text-sm">
+                            iOS Safari can't open blob URLs directly. Please choose an option below:
+                          </p>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <a
+                            href={`https://docs.google.com/viewer?url=${encodeURIComponent(fileViewerUrl)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center justify-center p-3 bg-blue-600/80 text-white rounded-lg hover:bg-blue-500/80 transition-colors"
+                          >
+                            <ExternalLink className="h-4 w-4 mr-2" />
+                            Google Docs Viewer
+                          </a>
+                          
+                          <a
+                            href={`https://mozilla.github.io/pdf.js/web/viewer.html?file=${encodeURIComponent(fileViewerUrl)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center justify-center p-3 bg-indigo-600/80 text-white rounded-lg hover:bg-indigo-500/80 transition-colors"
+                          >
+                            <ExternalLink className="h-4 w-4 mr-2" />
+                            PDF.js Viewer
+                          </a>
+                        </div>
+                        
+                        <a
+                          href={fileViewerUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="block w-full p-3 mt-2 bg-indigo-800/40 text-white text-center rounded-lg hover:bg-indigo-700/40 transition-colors"
+                        >
+                          <Download className="h-4 w-4 mr-2 inline-block" />
+                          Try Direct Download
+                        </a>
+                        
+                        <button
+                          onClick={() => setShowFileViewer(false)}
+                          className="block w-full p-3 bg-indigo-900/40 text-indigo-300 rounded-lg hover:bg-indigo-800/40 transition-colors"
+                        >
+                          Close
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    /* For non-iOS, use the existing viewer approach */
+                    <div className="max-w-md mx-auto text-center bg-indigo-900/60 p-8 rounded-xl border border-indigo-700/40 shadow-lg">
+                      <div className="mb-6 bg-indigo-800/30 p-4 rounded-full inline-flex">
+                        <FileText className="h-12 w-12 text-indigo-300" />
+                      </div>
+                      
+                      <h3 className="text-xl font-semibold text-white mb-3">
+                        {fileViewerName || "PDF Document"}
+                      </h3>
+                      
+                      <p className="text-indigo-200 mb-6">
+                        For security reasons, this PDF can't be viewed directly in this page. 
+                        Please use one of the options below to view the document.
+                      </p>
+                      
+                      <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                        <button
+                          className="px-4 py-3 bg-indigo-700 hover:bg-indigo-600 rounded-lg text-white flex items-center justify-center gap-2"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            window.open(fileViewerUrl, '_blank');
+                          }}
+                        >
+                          <ExternalLink className="h-4 w-4 mr-1" />
+                          Open in New Tab
+                        </button>
+                        
+                        <button
+                          className="px-4 py-3 bg-indigo-800/50 hover:bg-indigo-700/50 rounded-lg text-white flex items-center justify-center gap-2"
+                          onClick={() => setShowFileViewer(false)}
+                        >
+                          Close
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
               
@@ -956,12 +1037,17 @@ export default function CoursePage({ params }: CoursePageProps) {
                         e.preventDefault();
                         e.stopPropagation();
                         if (fileViewerUrl) {
-                          window.open(fileViewerUrl, '_blank');
+                          if (isIOS()) {
+                            // For iOS, offer Google Docs Viewer as alternative
+                            window.open(`https://docs.google.com/viewer?url=${encodeURIComponent(fileViewerUrl)}`, '_blank');
+                          } else {
+                            window.open(fileViewerUrl, '_blank');
+                          }
                         }
                       }}
                     >
                       <ExternalLink className="h-4 w-4 mr-2" />
-                      Open in New Tab
+                      {isIOS() ? "View with Google Docs" : "Open in New Tab"}
                     </button>
                     
                     <button
