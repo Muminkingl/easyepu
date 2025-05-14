@@ -309,7 +309,7 @@ export default function CoursePage({ params }: CoursePageProps) {
   };
 
   // Add a function to handle file viewing instead of downloading
-  const handleFileAction = (fileUrl: string, fileName: string, shouldShowPreview: boolean = false) => {
+  const handleFileAction = (fileUrl: string, fileName: string) => {
     if (!fileUrl) return;
 
     console.log(`Handling file action for: ${fileName}`);
@@ -327,26 +327,25 @@ export default function CoursePage({ params }: CoursePageProps) {
     
     console.log(`Determined file type: ${fileType}`);
     
-    // Force PDF extension for most education files
-    let fileNameWithExtension = fileName;
-    if (fileType === 'pdf') {
-      fileNameWithExtension = fileName.includes('.pdf') ? fileName : `${fileName}.pdf`;
-    } else {
-      fileNameWithExtension = ensureFileExtension(fileName, fileType, fileUrl);
-    }
-    
-    console.log(`Final filename with extension: ${fileNameWithExtension}`);
-
-    // Show preview if requested and file type is compatible
-    if (shouldShowPreview && ['image', 'video', 'audio', 'pdf'].includes(fileType)) {
-      setFileViewerUrl(fileUrl);
-      setFileViewerName(fileNameWithExtension);
-      setFileViewerType(fileType);
-      setShowFileViewer(true);
+    // For PDFs and media files, just open in a new tab
+    if (['pdf', 'image', 'video', 'audio'].includes(fileType)) {
+      console.log('Opening file in new tab:', fileUrl);
+      window.open(fileUrl, '_blank');
       return;
     }
-
+    
+    // For other file types, try to download
     try {
+      // Force PDF extension for most education files
+      let fileNameWithExtension = fileName;
+      if (fileType === 'pdf') {
+        fileNameWithExtension = fileName.includes('.pdf') ? fileName : `${fileName}.pdf`;
+      } else {
+        fileNameWithExtension = ensureFileExtension(fileName, fileType, fileUrl);
+      }
+      
+      console.log(`Final filename with extension: ${fileNameWithExtension}`);
+      
       // Create a blob URL for direct download if needed
       let downloadUrl = fileUrl;
       
@@ -677,28 +676,12 @@ export default function CoursePage({ params }: CoursePageProps) {
                                         </div>
                                         {file.file_url && (
                                           <div className="flex">
-                                            {/* Only show view button for previewable file types */}
-                                            {['image', 'video', 'audio', 'pdf'].includes(file.file_type.toLowerCase()) && (
-                                              <button 
-                                                onClick={(e) => {
-                                                  e.preventDefault();
-                                                  e.stopPropagation();
-                                                  if (file.file_url) {
-                                                    handleFileAction(file.file_url, file.title, true);
-                                                  }
-                                                }}
-                                                className="ml-2 p-2 hover:bg-indigo-700/50 rounded-full transition-colors"
-                                                title="View File"
-                                              >
-                                                <Eye className="h-5 w-5 text-indigo-300" />
-                                              </button>
-                                            )}
                                             <button 
                                               onClick={(e) => {
                                                 e.preventDefault();
                                                 e.stopPropagation();
                                                 if (file.file_url) {
-                                                  handleFileAction(file.file_url, file.title, false);
+                                                  handleFileAction(file.file_url, file.title);
                                                 }
                                               }}
                                               className="ml-2 p-2 hover:bg-indigo-700/50 rounded-full transition-colors"
@@ -795,7 +778,7 @@ export default function CoursePage({ params }: CoursePageProps) {
                           e.preventDefault();
                           e.stopPropagation();
                           if (file.file_url) {
-                            handleFileAction(file.file_url, file.title, true);
+                            handleFileAction(file.file_url, file.title);
                           }
                         }}
                         className="flex items-center p-3 w-full text-left bg-indigo-950/50 hover:bg-indigo-800/30 border border-indigo-800/30 hover:border-indigo-700/50 rounded-xl transition-all group"
@@ -991,14 +974,8 @@ export default function CoursePage({ params }: CoursePageProps) {
                         e.preventDefault();
                         e.stopPropagation();
                         if (fileViewerUrl) {
-                          try {
-                            // Download file without showing preview
-                            handleFileAction(fileViewerUrl, fileViewerName || 'download', false);
-                          } catch (error) {
-                            console.error('Download error:', error);
-                            // Fallback - just open in new tab
-                            window.open(fileViewerUrl, '_blank');
-                          }
+                          // Simply open in a new tab
+                          window.open(fileViewerUrl, '_blank');
                         }
                       }}
                     >
