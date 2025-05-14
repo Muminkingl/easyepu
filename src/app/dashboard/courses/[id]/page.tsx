@@ -338,88 +338,9 @@ export default function CoursePage({ params }: CoursePageProps) {
     const isIOSDevice = isIOS();
     console.log(`Is iOS device: ${isIOSDevice}`);
 
-    // For PDF files, always use the viewer which works on all platforms
-    if (fileType === 'pdf') {
-      console.log('Opening PDF in viewer:', fileUrl);
-      setFileViewerUrl(fileUrl);
-      setFileViewerName(fileName.includes('.pdf') ? fileName : `${fileName}.pdf`);
-      setFileViewerType('pdf');
-      setShowFileViewer(true);
-      return;
-    }
-
-    // For images, videos and audio on non-iOS, open in a new tab
-    if (['image', 'video', 'audio'].includes(fileType) && !isIOSDevice) {
-      console.log('Opening file in new tab:', fileUrl);
-      window.open(fileUrl, '_blank');
-      return;
-    }
-
-    // Special handling for iOS devices or non-media files
-    try {
-      // Force PDF extension for most education files
-      let fileNameWithExtension = fileName;
-      if (fileType === 'pdf') {
-        fileNameWithExtension = fileName.includes('.pdf') ? fileName : `${fileName}.pdf`;
-      } else {
-        fileNameWithExtension = ensureFileExtension(fileName, fileType, fileUrl);
-      }
-      
-      console.log(`Final filename with extension: ${fileNameWithExtension}`);
-      
-      // For iOS, we need to handle differently depending on type
-      if (isIOSDevice) {
-        if (['image'].includes(fileType)) {
-          // For images on iOS, we'll use a modal preview if available
-          setFileViewerUrl(fileUrl);
-          setFileViewerName(fileNameWithExtension);
-          setFileViewerType(fileType);
-          setShowFileViewer(true);
-          return;
-        } else if (['video', 'audio'].includes(fileType)) {
-          // For media on iOS, still try opening in a new tab
-          window.open(fileUrl, '_blank');
-          return;
-        }
-      }
-      
-      // For other files and cases, try download
-      // Create a blob URL for direct download if needed
-      let downloadUrl = fileUrl;
-      
-      // Force "download" parameter for all URLs to ensure they download properly
-      if (!downloadUrl.includes('download=')) {
-        downloadUrl = `${downloadUrl}${downloadUrl.includes('?') ? '&' : '?'}download=1`;
-      }
-      
-      console.log(`Download URL: ${downloadUrl}`);
-      
-      // Create a hidden anchor element for download
-      const a = document.createElement('a');
-      a.style.display = 'none';
-      a.href = downloadUrl;
-      a.download = fileNameWithExtension;
-      a.target = '_blank'; // Open in new tab if direct download fails
-      
-      // Set attribute to force download
-      a.setAttribute('download', fileNameWithExtension);
-      
-      // Important: prevent the browser from sanitizing the filename
-      a.rel = 'noopener noreferrer';
-      
-      document.body.appendChild(a);
-      a.click();
-      
-      // Clean up
-      setTimeout(() => {
-        document.body.removeChild(a);
-      }, 100);
-    } catch (error) {
-      console.error('File handling error:', error);
-      
-      // Fallback for browsers that block downloads
-      window.open(fileUrl, '_blank');
-    }
+    // For all files, just open in a new tab - no more iframe or blob URL issues
+    console.log('Opening file in new tab:', fileUrl);
+    window.open(fileUrl, '_blank');
   };
 
   // Function to create a download link with proper content-disposition
@@ -933,25 +854,51 @@ export default function CoursePage({ params }: CoursePageProps) {
             {/* File viewer content */}
             <div className={`w-full ${isFullscreen ? 'h-[calc(100vh-56px)]' : 'h-[60vh]'} bg-gray-900/50`}>
               {fileViewerType === 'pdf' && (
-                <div className="w-full h-full flex flex-col items-center justify-center p-0">
-                  {/* Custom PDF viewer that works on all platforms including iOS */}
-                  <iframe 
-                    src={fileViewerUrl}
-                    className="w-full h-full border-0" 
-                    title={fileViewerName || "PDF Document"}
-                    sandbox="allow-same-origin allow-scripts"
-                    loading="eager"
-                    importance="high"
-                  />
-                  
-                  {/* iOS download instructions */}
-                  {isIOS() && (
-                    <div className="absolute bottom-0 left-0 right-0 bg-indigo-900/80 backdrop-blur-sm p-3 text-center">
-                      <p className="text-white text-sm">
-                        To save this PDF on iOS, tap and hold on the document, then select "Download" or "Share" → "Save to Files"
-                      </p>
+                <div className="w-full h-full flex flex-col items-center justify-center p-6 bg-indigo-950/70">
+                  {/* Simple PDF download instructions instead of viewer */}
+                  <div className="max-w-md mx-auto text-center bg-indigo-900/60 p-8 rounded-xl border border-indigo-700/40 shadow-lg">
+                    <div className="mb-6 bg-indigo-800/30 p-4 rounded-full inline-flex">
+                      <FileText className="h-12 w-12 text-indigo-300" />
                     </div>
-                  )}
+                    
+                    <h3 className="text-xl font-semibold text-white mb-3">
+                      {fileViewerName || "PDF Document"}
+                    </h3>
+                    
+                    <p className="text-indigo-200 mb-6">
+                      For security reasons, this PDF can't be viewed directly in this page. 
+                      Please use one of the options below to view the document.
+                    </p>
+                    
+                    <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                      <button
+                        className="px-4 py-3 bg-indigo-700 hover:bg-indigo-600 rounded-lg text-white flex items-center justify-center gap-2"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          window.open(fileViewerUrl, '_blank');
+                        }}
+                      >
+                        <ExternalLink className="h-4 w-4 mr-1" />
+                        Open in New Tab
+                      </button>
+                      
+                      <button
+                        className="px-4 py-3 bg-indigo-800/50 hover:bg-indigo-700/50 rounded-lg text-white flex items-center justify-center gap-2"
+                        onClick={() => setShowFileViewer(false)}
+                      >
+                        Close
+                      </button>
+                    </div>
+                    
+                    {isIOS() && (
+                      <div className="mt-6 p-3 bg-blue-900/30 border border-blue-700/20 rounded-lg">
+                        <p className="text-blue-200 text-sm">
+                          <span className="font-medium">iOS tip:</span> After opening, tap the share icon and select "Save to Files" to download.
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
               
@@ -1009,19 +956,12 @@ export default function CoursePage({ params }: CoursePageProps) {
                         e.preventDefault();
                         e.stopPropagation();
                         if (fileViewerUrl) {
-                          // Handle iOS differently
-                          if (isIOS()) {
-                            // Try to open in Safari for iOS
-                            window.location.href = fileViewerUrl;
-                          } else {
-                            // For other platforms, open in new tab
-                            window.open(fileViewerUrl, '_blank');
-                          }
+                          window.open(fileViewerUrl, '_blank');
                         }
                       }}
                     >
-                      <Download className="h-4 w-4 mr-2" />
-                      {isIOS() ? "Open in Safari" : "Download"}
+                      <ExternalLink className="h-4 w-4 mr-2" />
+                      Open in New Tab
                     </button>
                     
                     <button
