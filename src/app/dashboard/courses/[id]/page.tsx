@@ -236,6 +236,15 @@ export default function CoursePage({ params }: CoursePageProps) {
 
   // This function detects file type from either file name, URL, or content
   const determineFileType = (fileName: string, fileUrl?: string): string => {
+    // For course materials, assume PDF by default
+    if (fileName.toLowerCase().includes('lecture') || 
+        fileName.toLowerCase().includes('course') ||
+        fileName.toLowerCase().includes('material') ||
+        fileName.toLowerCase().includes('slides') ||
+        fileName.toLowerCase().includes('notes')) {
+      return 'pdf';
+    }
+    
     // Try to get extension from filename first
     let extension = fileName.split('.').pop()?.toLowerCase() || '';
     
@@ -243,7 +252,15 @@ export default function CoursePage({ params }: CoursePageProps) {
     if (!extension && fileUrl) {
       // Check for content type in URL
       const lowerUrl = fileUrl.toLowerCase();
-      if (lowerUrl.includes('content-type=application/pdf') || lowerUrl.includes('/pdf')) {
+      
+      // Very aggressive PDF detection - Vercel Blob URLs often lose file metadata
+      if (lowerUrl.includes('content-type=application/pdf') || 
+          lowerUrl.includes('/pdf') ||
+          lowerUrl.includes('lecture') ||
+          lowerUrl.includes('course') ||
+          lowerUrl.includes('vercel-storage') ||
+          lowerUrl.includes('vercel-blob') ||
+          lowerUrl.includes('blob.vercel')) {
         return 'pdf';
       }
       
@@ -272,8 +289,10 @@ export default function CoursePage({ params }: CoursePageProps) {
     } else if (['xls', 'xlsx', 'csv'].includes(extension)) {
       return 'spreadsheet';
     } else {
-      // If we get to this point with a URL that has 'pdf' anywhere in it, assume PDF
-      if (fileUrl && fileUrl.toLowerCase().includes('pdf')) {
+      // Default to PDF for course files when we can't determine type
+      if (fileName.includes('Lecture') || fileName.includes('lecture') || 
+          fileName.includes('Course') || fileName.includes('course') ||
+          fileUrl?.includes('vercel-blob') || fileUrl?.includes('blob.vercel')) {
         return 'pdf';
       }
       return 'generic';
@@ -284,13 +303,32 @@ export default function CoursePage({ params }: CoursePageProps) {
   const handleFileAction = (fileUrl: string, fileName: string) => {
     if (!fileUrl) return;
 
-    // Get file type with improved detection using URL
-    const fileType = determineFileType(fileName, fileUrl);
-    const fileNameWithExtension = ensureFileExtension(fileName, fileType, fileUrl);
+    // For lectures, course materials, or anything from Vercel Blob storage, default to PDF
+    let fileType = 'generic';
+    if (fileName.toLowerCase().includes('lecture') || 
+        fileName.toLowerCase().includes('course') || 
+        fileName.toLowerCase().includes('material') ||
+        fileUrl.includes('vercel-blob') ||
+        fileUrl.includes('blob.vercel')) {
+      fileType = 'pdf';
+    } else {
+      // Otherwise use our improved detection
+      fileType = determineFileType(fileName, fileUrl);
+    }
+    
+    // Force PDF extension for lecture materials
+    let fileNameWithExtension = fileName;
+    if (fileType === 'pdf' || 
+        fileName.toLowerCase().includes('lecture') || 
+        fileName.toLowerCase().includes('course')) {
+      fileNameWithExtension = fileName.includes('.pdf') ? fileName : `${fileName}.pdf`;
+    } else {
+      fileNameWithExtension = ensureFileExtension(fileName, fileType, fileUrl);
+    }
 
     // Simple direct download approach that works for most cases
     try {
-      // For Vercel Blob storage specifically, force content disposition
+      // For Vercel Blob storage specifically, force content disposition and add download parameter
       const downloadUrl = fileUrl.includes('vercel-blob.com') || fileUrl.includes('blob.vercel.app') 
         ? `${fileUrl}${fileUrl.includes('?') ? '&' : '?'}download=1` 
         : fileUrl;
@@ -301,6 +339,10 @@ export default function CoursePage({ params }: CoursePageProps) {
       a.href = downloadUrl;
       a.download = fileNameWithExtension;
       a.target = '_blank'; // Open in new tab if direct download fails
+      
+      // Set attribute to force download
+      a.setAttribute('download', fileNameWithExtension);
+      
       document.body.appendChild(a);
       a.click();
       
@@ -330,6 +372,15 @@ export default function CoursePage({ params }: CoursePageProps) {
         setShowFileViewer(true);
       }
     }
+  };
+
+  // Function to create a download link with proper content-disposition
+  const createDirectDownloadLink = (url: string, filename: string): string => {
+    // For Vercel Blob storage, use download parameter
+    if (url.includes('vercel-blob.com') || url.includes('blob.vercel.app')) {
+      return `${url}${url.includes('?') ? '&' : '?'}download=1`;
+    }
+    return url;
   };
 
   // Toggle fullscreen for the file viewer
@@ -895,26 +946,45 @@ export default function CoursePage({ params }: CoursePageProps) {
                         e.stopPropagation();
                         if (fileViewerUrl) {
                           try {
-                            // Simple direct download approach
+                            // For lectures, course materials or viewer items, default to PDF
+                            let fileType = 'generic';
+                            if (fileViewerName?.toLowerCase().includes('lecture') || 
+                                fileViewerName?.toLowerCase().includes('course') || 
+                                fileViewerName?.toLowerCase().includes('material') ||
+                                fileViewerUrl.includes('vercel-blob') ||
+                                fileViewerUrl.includes('blob.vercel')) {
+                              fileType = 'pdf';
+                            } else if (fileViewerType) {
+                              fileType = fileViewerType;
+                            } else {
+                              fileType = determineFileType(fileViewerName || 'download', fileViewerUrl);
+                            }
+                            
+                            // Force PDF extension for lecture materials
+                            let fileNameWithExtension = fileViewerName || 'download';
+                            if (fileType === 'pdf' || 
+                                fileNameWithExtension.toLowerCase().includes('lecture') || 
+                                fileNameWithExtension.toLowerCase().includes('course')) {
+                              fileNameWithExtension = fileNameWithExtension.includes('.pdf') 
+                                ? fileNameWithExtension 
+                                : `${fileNameWithExtension}.pdf`;
+                            } else {
+                              fileNameWithExtension = ensureFileExtension(
+                                fileNameWithExtension, 
+                                fileType, 
+                                fileViewerUrl
+                              );
+                            }
+                            
+                            // Create direct download URL with proper disposition
+                            const downloadUrl = createDirectDownloadLink(fileViewerUrl, fileNameWithExtension);
+                            
+                            // Download using temporary anchor element
                             const a = document.createElement('a');
                             a.style.display = 'none';
-                            
-                            // For Vercel Blob storage, force content disposition
-                            const downloadUrl = fileViewerUrl.includes('vercel-blob.com') || fileViewerUrl.includes('blob.vercel.app') 
-                              ? `${fileViewerUrl}${fileViewerUrl.includes('?') ? '&' : '?'}download=1` 
-                              : fileViewerUrl;
-                              
                             a.href = downloadUrl;
-                            
-                            // Better file extension detection
-                            const fileType = determineFileType(fileViewerName || 'download', fileViewerUrl);
-                            const fileNameWithExtension = ensureFileExtension(
-                              fileViewerName || 'download', 
-                              fileType, 
-                              fileViewerUrl
-                            );
-                            
                             a.download = fileNameWithExtension;
+                            a.setAttribute('download', fileNameWithExtension);
                             a.target = '_blank'; // Open in new tab if direct download fails
                             document.body.appendChild(a);
                             a.click();
