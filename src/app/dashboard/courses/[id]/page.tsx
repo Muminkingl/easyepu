@@ -188,9 +188,46 @@ export default function CoursePage({ params }: CoursePageProps) {
     }
   };
 
+  // Add a function to ensure filename has correct extension
+  const ensureFileExtension = (fileName: string, fileType: string, fileUrl: string): string => {
+    // If fileName already has an extension, return it
+    if (fileName.includes('.')) {
+      return fileName;
+    }
+    
+    // Extract extension from URL if possible
+    const urlExtension = fileUrl.split('?')[0].split('.').pop()?.toLowerCase();
+    if (urlExtension && !['com', 'org', 'net', 'io', 'vercel'].includes(urlExtension)) {
+      return `${fileName}.${urlExtension}`;
+    }
+    
+    // Determine extension based on file type
+    switch (fileType.toLowerCase()) {
+      case 'pdf': return `${fileName}.pdf`;
+      case 'image': return `${fileName}.png`;
+      case 'jpeg': case 'jpg': return `${fileName}.jpg`;
+      case 'png': return `${fileName}.png`;
+      case 'gif': return `${fileName}.gif`;
+      case 'video': return `${fileName}.mp4`;
+      case 'audio': return `${fileName}.mp3`;
+      case 'doc': case 'document': return `${fileName}.docx`;
+      case 'docx': return `${fileName}.docx`;
+      case 'ppt': case 'presentation': return `${fileName}.pptx`;
+      case 'pptx': return `${fileName}.pptx`;
+      case 'xls': case 'spreadsheet': return `${fileName}.xlsx`;
+      case 'xlsx': return `${fileName}.xlsx`;
+      case 'csv': return `${fileName}.csv`;
+      default: return `${fileName}.${fileType.toLowerCase()}`;
+    }
+  };
+
   // Add a function to handle file viewing instead of downloading
   const handleFileAction = (fileUrl: string, fileName: string) => {
     if (!fileUrl) return;
+
+    // Get file type and ensure proper extension
+    const fileType = fileName.includes('.') ? fileName.split('.').pop()?.toLowerCase() || 'generic' : 'generic';
+    const fileNameWithExtension = ensureFileExtension(fileName, fileType, fileUrl);
 
     // Check if we're in production or development
     const isProduction = typeof window !== 'undefined' && window.location.hostname !== 'localhost';
@@ -208,7 +245,7 @@ export default function CoursePage({ params }: CoursePageProps) {
           
           // Create a FormData object to send the blob
           const formData = new FormData();
-          formData.append('file', blob, fileName);
+          formData.append('file', blob, fileNameWithExtension);
           
           // Use the download API to handle the blob data
           fetch('/api/download', {
@@ -222,10 +259,10 @@ export default function CoursePage({ params }: CoursePageProps) {
               window.open(data.downloadUrl, '_blank');
               
               // Show preview for compatible file types
-              const fileType = determineFileType(fileName);
+              const fileType = determineFileType(fileNameWithExtension);
               if (['image', 'video', 'audio', 'pdf'].includes(fileType)) {
                 setFileViewerUrl(fileUrl);
-                setFileViewerName(fileName);
+                setFileViewerName(fileNameWithExtension);
                 setFileViewerType(fileType);
                 setShowFileViewer(true);
               }
@@ -258,15 +295,15 @@ export default function CoursePage({ params }: CoursePageProps) {
       const a = document.createElement('a');
       a.style.display = 'none';
       a.href = fileUrl;
-      a.download = fileName || 'download';
+      a.download = fileNameWithExtension;
       document.body.appendChild(a);
       a.click();
       
       // Also show preview for compatible file types
-      const fileType = determineFileType(fileName);
+      const fileType = determineFileType(fileNameWithExtension);
       if (['image', 'video', 'audio', 'pdf'].includes(fileType)) {
         setFileViewerUrl(fileUrl);
-        setFileViewerName(fileName);
+        setFileViewerName(fileNameWithExtension);
         setFileViewerType(fileType);
         setShowFileViewer(true);
       }
@@ -283,15 +320,15 @@ export default function CoursePage({ params }: CoursePageProps) {
       console.error('File handling error:', error);
       
       // Show preview as fallback if download fails
-      const fileType = determineFileType(fileName);
+      const fileType = determineFileType(fileNameWithExtension);
       if (['image', 'video', 'audio', 'pdf'].includes(fileType)) {
         setFileViewerUrl(fileUrl);
-        setFileViewerName(fileName);
+        setFileViewerName(fileNameWithExtension);
         setFileViewerType(fileType);
         setShowFileViewer(true);
       } else {
         // For other file types, use the proxy API as a fallback
-        const proxyUrl = `/api/download?url=${encodeURIComponent(fileUrl)}&filename=${encodeURIComponent(fileName)}`;
+        const proxyUrl = `/api/download?url=${encodeURIComponent(fileUrl)}&filename=${encodeURIComponent(fileNameWithExtension)}`;
         window.open(proxyUrl, '_blank');
       }
     }
@@ -874,7 +911,8 @@ export default function CoursePage({ params }: CoursePageProps) {
                                 
                                 // Create a FormData object to send the blob
                                 const formData = new FormData();
-                                formData.append('file', blob, fileViewerName || 'download');
+                                const fileNameWithExtension = ensureFileExtension(fileViewerName || 'download', fileViewerType || 'generic', fileViewerUrl);
+                                formData.append('file', blob, fileNameWithExtension);
                                 
                                 // Use the download API to handle the blob data
                                 fetch('/api/download', {
@@ -911,7 +949,8 @@ export default function CoursePage({ params }: CoursePageProps) {
                             const a = document.createElement('a');
                             a.style.display = 'none';
                             a.href = fileViewerUrl;
-                            a.download = fileViewerName || 'download';
+                            const fileNameWithExtension = ensureFileExtension(fileViewerName || 'download', fileViewerType || 'generic', fileViewerUrl);
+                            a.download = fileNameWithExtension;
                             document.body.appendChild(a);
                             a.click();
                             
