@@ -197,44 +197,59 @@ export default function CoursePage({ params }: CoursePageProps) {
 
     // Special handling for blob URLs in production
     if (isProduction && fileUrl.startsWith('blob:')) {
-      // For blob URLs, we need to fetch the actual data and send it
-      fetch(fileUrl)
-        .then(response => response.blob())
-        .then(blob => {
+      // For blob URLs, use XMLHttpRequest instead of fetch (which doesn't support blob URLs in some environments)
+      const xhr = new XMLHttpRequest();
+      xhr.open('GET', fileUrl, true);
+      xhr.responseType = 'blob';
+      
+      xhr.onload = function() {
+        if (this.status === 200) {
+          const blob = this.response;
+          
           // Create a FormData object to send the blob
           const formData = new FormData();
           formData.append('file', blob, fileName);
           
           // Use the download API to handle the blob data
-          return fetch('/api/download', {
+          fetch('/api/download', {
             method: 'POST',
             body: formData
-          });
-        })
-        .then(response => response.json())
-        .then(data => {
-          if (data.success && data.downloadUrl) {
-            // Open the download URL in a new tab
-            window.open(data.downloadUrl, '_blank');
-            
-            // Show preview for compatible file types
-            const fileType = determineFileType(fileName);
-            if (['image', 'video', 'audio', 'pdf'].includes(fileType)) {
-              setFileViewerUrl(fileUrl);
-              setFileViewerName(fileName);
-              setFileViewerType(fileType);
-              setShowFileViewer(true);
+          })
+          .then(response => response.json())
+          .then(data => {
+            if (data.success && data.downloadUrl) {
+              // Open the download URL in a new tab
+              window.open(data.downloadUrl, '_blank');
+              
+              // Show preview for compatible file types
+              const fileType = determineFileType(fileName);
+              if (['image', 'video', 'audio', 'pdf'].includes(fileType)) {
+                setFileViewerUrl(fileUrl);
+                setFileViewerName(fileName);
+                setFileViewerType(fileType);
+                setShowFileViewer(true);
+              }
+            } else {
+              console.error('Failed to process file download:', data.error);
+              alert('Failed to download file. Please try again.');
             }
-          } else {
-            console.error('Failed to process file download:', data.error);
-            alert('Failed to download file. Please try again.');
-          }
-        })
-        .catch(error => {
-          console.error('Error processing file download:', error);
-          alert('Failed to download file. Please try again later.');
-        });
+          })
+          .catch(error => {
+            console.error('Error processing file download:', error);
+            alert('Failed to download file. Please try again later.');
+          });
+        } else {
+          console.error('Failed to load blob:', this.status);
+          alert('Failed to load the file. Please try again.');
+        }
+      };
       
+      xhr.onerror = function() {
+        console.error('XHR error for blob URL');
+        alert('Error accessing the file. Please try again later.');
+      };
+      
+      xhr.send();
       return;
     }
 
@@ -411,7 +426,7 @@ export default function CoursePage({ params }: CoursePageProps) {
       <div 
         className={`bg-gradient-to-r from-indigo-600 to-purple-700 py-8 px-4 sm:px-6 lg:px-8 relative overflow-hidden`}
         style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm-43-7c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm63 31c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM34 90c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm56-76c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM12 86c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm28-65c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm23-11c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-6 60c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm29 22c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zM32 63c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm57-13c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-9-21c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM60 91c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM35 41c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM12 60c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2z' fill='%23ffffff' fill-opacity='0.05' fill-rule='evenodd'/%3E%3C/svg%3E")`,
+          backgroundImage: `url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm-43-7c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm63 31c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM34 90c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm56-76c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM12 86c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm28-65c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm23-11c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-6 60c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm29 22c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zM32 63c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm57-13c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-9-21c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zm60 91c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM35 41c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM12 60c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2z' fill='%23ffffff' fill-opacity='0.05' fill-rule='evenodd'/%3E%3C/svg%3E")`,
         }}
       >
         <div className="max-w-6xl mx-auto relative z-10">
@@ -848,33 +863,49 @@ export default function CoursePage({ params }: CoursePageProps) {
                           const isProduction = typeof window !== 'undefined' && window.location.hostname !== 'localhost';
                           
                           if (isProduction && fileViewerUrl.startsWith('blob:')) {
-                            // For blob URLs in production, fetch the actual data
-                            fetch(fileViewerUrl)
-                              .then(response => response.blob())
-                              .then(blob => {
+                            // For blob URLs in production, use XMLHttpRequest instead of fetch
+                            const xhr = new XMLHttpRequest();
+                            xhr.open('GET', fileViewerUrl, true);
+                            xhr.responseType = 'blob';
+                            
+                            xhr.onload = function() {
+                              if (this.status === 200) {
+                                const blob = this.response;
+                                
                                 // Create a FormData object to send the blob
                                 const formData = new FormData();
                                 formData.append('file', blob, fileViewerName || 'download');
                                 
                                 // Use the download API to handle the blob data
-                                return fetch('/api/download', {
+                                fetch('/api/download', {
                                   method: 'POST',
                                   body: formData
+                                })
+                                .then(response => response.json())
+                                .then(data => {
+                                  if (data.success && data.downloadUrl) {
+                                    window.open(data.downloadUrl, '_blank');
+                                  } else {
+                                    console.error('Failed to process file download:', data.error);
+                                    alert('Failed to download file. Please try again.');
+                                  }
+                                })
+                                .catch(error => {
+                                  console.error('Error processing file download:', error);
+                                  alert('Failed to download file. Please try again later.');
                                 });
-                              })
-                              .then(response => response.json())
-                              .then(data => {
-                                if (data.success && data.downloadUrl) {
-                                  window.open(data.downloadUrl, '_blank');
-                                } else {
-                                  console.error('Failed to process file download:', data.error);
-                                  alert('Failed to download file. Please try again.');
-                                }
-                              })
-                              .catch(error => {
-                                console.error('Error processing file download:', error);
-                                alert('Failed to download file. Please try again later.');
-                              });
+                              } else {
+                                console.error('Failed to load blob:', this.status);
+                                alert('Failed to load the file. Please try again.');
+                              }
+                            };
+                            
+                            xhr.onerror = function() {
+                              console.error('XHR error for blob URL');
+                              alert('Error accessing the file. Please try again later.');
+                            };
+                            
+                            xhr.send();
                           } else {
                             // Regular download for non-blob URLs or local development
                             const a = document.createElement('a');
