@@ -227,4 +227,128 @@ export async function deletePresentationFile(fileUrl: string): Promise<boolean> 
     console.error('Error deleting file:', error);
     return false;
   }
+}
+
+/**
+ * Upload a course file to Vercel Blob
+ * @param file The file to upload
+ * @param courseId The course ID
+ * @returns A promise that resolves to the file URL if successful, or null if failed
+ */
+export async function uploadCourseFile(file: File, courseId: string): Promise<string | null> {
+  try {
+    // Generate a unique filename
+    const timestamp = Date.now();
+    const filename = `courses/${courseId}/${timestamp}-${file.name}`;
+
+    // Upload to Vercel Blob
+    const blob = await put(filename, file, {
+      access: 'public',
+    });
+    
+    // Return the URL to the uploaded file
+    return blob.url;
+  } catch (error) {
+    console.error('Error uploading course file:', error);
+    return null;
+  }
+}
+
+/**
+ * Update the course file URL in the database
+ * @param courseId The course ID
+ * @param fileUrl The URL of the uploaded file
+ * @param fileName The original file name
+ * @returns A promise that resolves to true if successful, or false if failed
+ */
+export async function updateCourseFile(
+  courseId: string,
+  fileUrl: string,
+  fileName: string
+): Promise<boolean> {
+  try {
+    if (!supabase) {
+      console.error('Supabase client is not initialized');
+      return false;
+    }
+
+    const { error } = await supabase
+      .from('courses')
+      .update({
+        file_url: fileUrl,
+        file_name: fileName,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', courseId);
+
+    if (error) {
+      console.error('Error updating course file record:', error);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error updating course file record:', error);
+    return false;
+  }
+}
+
+/**
+ * Get the file for a course
+ * @param courseId The course ID
+ * @returns A promise that resolves to the file URL and name if successful, or null if failed
+ */
+export async function getCourseFile(
+  courseId: string
+): Promise<{ url: string; name: string } | null> {
+  try {
+    if (!supabase) {
+      console.error('Supabase client is not initialized');
+      return null;
+    }
+
+    const { data, error } = await supabase
+      .from('courses')
+      .select('file_url, file_name')
+      .eq('id', courseId)
+      .single();
+
+    if (error) {
+      console.error('Error fetching course file data:', error);
+      return null;
+    }
+
+    if (data.file_url && data.file_name) {
+      return {
+        url: data.file_url,
+        name: data.file_name
+      };
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Error fetching course file:', error);
+    return null;
+  }
+}
+
+/**
+ * Delete a course file from storage
+ * @param fileUrl The URL of the file to delete
+ * @returns A promise that resolves to true if successful, or false if failed
+ */
+export async function deleteCourseFile(fileUrl: string): Promise<boolean> {
+  try {
+    if (!fileUrl) {
+      console.error('No file URL provided for deletion');
+      return false;
+    }
+    
+    await del(fileUrl);
+    
+    return true;
+  } catch (error) {
+    console.error('Error deleting course file:', error);
+    return false;
+  }
 } 

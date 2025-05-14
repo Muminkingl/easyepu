@@ -27,11 +27,14 @@ import {
   Info,
   ExternalLink,
   Maximize2,
-  Minimize2
+  Minimize2,
+  FileText,
+  Eye
 } from 'lucide-react';
 import { Course, CourseSection, CourseFile } from '@/lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslations } from '@/lib/i18n';
+import { getCourseFileAction } from '@/lib/actions';
 
 interface CoursePageProps {
   params: Promise<{ id: string }> | { id: string };
@@ -51,6 +54,7 @@ export default function CoursePage({ params }: CoursePageProps) {
   const [fileViewerName, setFileViewerName] = useState<string | null>(null);
   const [fileViewerType, setFileViewerType] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [courseMaterialFile, setCourseMaterialFile] = useState<{ url: string; name: string } | null>(null);
   const { t, dir } = useTranslations();
   
   // Using Next.js 15+ approach with use() to unwrap params
@@ -268,6 +272,22 @@ export default function CoursePage({ params }: CoursePageProps) {
   const toggleFullscreen = () => {
     setIsFullscreen(!isFullscreen);
   };
+
+  // Fetch the main course file uploaded by admin
+  useEffect(() => {
+    const fetchCourseFile = async () => {
+      try {
+        const fileData = await getCourseFileAction(courseId);
+        if (fileData) {
+          setCourseMaterialFile(fileData);
+        }
+      } catch (error) {
+        console.error('Error fetching course file:', error);
+      }
+    };
+    
+    fetchCourseFile();
+  }, [courseId]);
 
   if (loading) {
     return (
@@ -534,12 +554,14 @@ export default function CoursePage({ params }: CoursePageProps) {
                                             onClick={(e) => {
                                               e.preventDefault();
                                               e.stopPropagation();
-                                              handleFileAction(file.file_url, file.title);
+                                              if (file.file_url) {
+                                                handleFileAction(file.file_url, file.title);
+                                              }
                                             }}
                                             className="ml-2 p-2 hover:bg-indigo-700/50 rounded-full transition-colors"
-                                            title="View File"
+                                            title="Download File"
                                           >
-                                            <FileIcon className="h-5 w-5 text-indigo-300" />
+                                            <Download className="h-5 w-5 text-indigo-300" />
                                           </button>
                                         )}
                                       </motion.div>
@@ -628,7 +650,9 @@ export default function CoursePage({ params }: CoursePageProps) {
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
-                          handleFileAction(file.file_url, file.title);
+                          if (file.file_url) {
+                            handleFileAction(file.file_url, file.title);
+                          }
                         }}
                         className="flex items-center p-3 w-full text-left bg-indigo-950/50 hover:bg-indigo-800/30 border border-indigo-800/30 hover:border-indigo-700/50 rounded-xl transition-all group"
                       >
@@ -639,7 +663,7 @@ export default function CoursePage({ params }: CoursePageProps) {
                           <div className="font-medium text-white group-hover:text-indigo-200 transition-colors">{file.title}</div>
                           <div className="text-xs text-indigo-400">{file.file_type.toUpperCase()}</div>
                         </div>
-                        <FileIcon className="h-4 w-4 text-indigo-300 opacity-70 group-hover:opacity-100" />
+                        <Download className="h-4 w-4 text-indigo-300 opacity-70 group-hover:opacity-100" />
                       </button>
                     ))}
                   
@@ -663,6 +687,50 @@ export default function CoursePage({ params }: CoursePageProps) {
         </div>
       </div>
       
+      {/* Course Material File Section */}
+      {courseMaterialFile && (
+        <div className="mb-6 bg-indigo-900/40 backdrop-blur-sm rounded-2xl overflow-hidden shadow-lg border border-indigo-800/30">
+          <div className="border-b border-indigo-800/30 px-6 py-4">
+            <h2 className="font-semibold text-indigo-100 flex items-center">
+              <FileText className="h-5 w-5 mr-2 text-indigo-300" />
+              {t('courseDetails.courseMaterials')}
+            </h2>
+          </div>
+          
+          <div className="p-6">
+            <div className="p-4 bg-indigo-800/30 rounded-lg border border-indigo-700/30">
+              <div className="flex items-center mb-3">
+                <Download className="h-6 w-6 mr-3 text-indigo-300" />
+                <div className="text-indigo-200 font-medium">
+                  {courseMaterialFile.name}
+                </div>
+              </div>
+              
+              <div className="flex space-x-3">
+                <a
+                  href={courseMaterialFile.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center px-3 py-2 text-sm bg-blue-700/50 text-white font-medium rounded hover:bg-blue-600/50 border border-blue-600/30 transition-colors"
+                >
+                  <Download className="h-4 w-4 mr-1.5" />
+                  {t('courseDetails.viewFile')}
+                </a>
+                
+                <a
+                  href={courseMaterialFile.url}
+                  download
+                  className="inline-flex items-center px-3 py-2 text-sm bg-indigo-700/50 text-white font-medium rounded hover:bg-indigo-600/50 border border-indigo-600/30 transition-colors"
+                >
+                  <Download className="h-4 w-4 mr-1.5" />
+                  {t('courseDetails.downloadFile')}
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      
       {/* In-page file viewer modal */}
       {showFileViewer && fileViewerUrl && (
         <div className={`fixed inset-0 bg-black/70 z-50 flex items-center justify-center backdrop-blur-sm p-4 ${isFullscreen ? 'p-0' : 'p-4'}`}>
@@ -670,7 +738,7 @@ export default function CoursePage({ params }: CoursePageProps) {
             {/* Header with controls */}
             <div className="flex items-center justify-between bg-indigo-950 px-4 py-3 border-b border-indigo-800/50">
               <h3 className="text-lg font-medium text-white flex items-center gap-2">
-                <FileIcon className="h-5 w-5 text-indigo-400" />
+                <Download className="h-5 w-5 text-indigo-400" />
                 {fileViewerName}
               </h3>
               
@@ -748,7 +816,7 @@ export default function CoursePage({ params }: CoursePageProps) {
                 fileViewerType === 'spreadsheet' || fileViewerType === 'generic') && (
                 <div className="w-full h-full flex flex-col items-center justify-center p-8 text-center">
                   <div className="mb-8 p-6 bg-indigo-800/20 rounded-full">
-                    <FileIcon className="h-16 w-16 text-indigo-400" />
+                    <Download className="h-16 w-16 text-indigo-400" />
                   </div>
                   <h3 className="text-xl font-medium text-white mb-3">{fileViewerName}</h3>
                   <p className="text-indigo-300 mb-8 max-w-lg">

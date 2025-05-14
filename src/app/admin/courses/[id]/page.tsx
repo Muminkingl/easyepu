@@ -1,11 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ChevronLeft, AlertTriangle, Loader2, BookOpen, Palette, PencilIcon, Eye, EyeOff } from 'lucide-react';
+import { ChevronLeft, AlertTriangle, Loader2, BookOpen, Palette, PencilIcon, Eye, EyeOff, Upload, FileIcon, CheckCircle, XCircle, Download } from 'lucide-react';
 import { getCourseById } from '@/lib/supabase';
 import { useUserRole } from '@/hooks/useUserRole';
+import { getCourseFileAction } from '@/lib/actions';
+import { useUser } from '@clerk/nextjs';
 import React from 'react';
 
 interface CoursePageProps {
@@ -20,6 +22,12 @@ export default function CoursePage({ params }: CoursePageProps) {
   const [course, setCourse] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const { user } = useUser();
+  const [courseFile, setCourseFile] = useState<{ url: string; name: string } | null>(null);
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const [fileUploadError, setFileUploadError] = useState('');
+  const [fileUploadSuccess, setFileUploadSuccess] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Unwrap params with React.use()
   const unwrappedParams = React.use(params as any);
@@ -34,6 +42,12 @@ export default function CoursePage({ params }: CoursePageProps) {
           setError('Course not found');
         } else {
           setCourse(courseData);
+          
+          // Load course file if it exists
+          const fileData = await getCourseFileAction(courseId);
+          if (fileData) {
+            setCourseFile(fileData);
+          }
         }
       } catch (err) {
         console.error('Error loading course:', err);
@@ -45,6 +59,83 @@ export default function CoursePage({ params }: CoursePageProps) {
 
     loadCourse();
   }, [courseId]);
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !user) return;
+    
+    // Reset states
+    setFileUploadError('');
+    setFileUploadSuccess('');
+    
+    // Validate file size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      setFileUploadError('File size exceeds the 10MB limit.');
+      return;
+    }
+    
+    // Validate file type (PDF, DOC, DOCX, PPT, PPTX, XLS, XLSX, etc.)
+    const validTypes = [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-powerpoint',
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    ];
+    
+    if (!validTypes.includes(file.type)) {
+      setFileUploadError('Invalid file type. Please upload PDF, DOC, DOCX, PPT, PPTX, XLS, or XLSX files.');
+      return;
+    }
+    
+    setUploadingFile(true);
+    
+    try {
+      // Create FormData for the file upload
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('userId', user.id);
+      formData.append('courseId', courseId);
+      
+      // Use the server-side endpoint to handle the upload
+      const response = await fetch('/api/upload-course-file', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        setFileUploadSuccess('File uploaded successfully!');
+        
+        // Update the course file state for immediate feedback
+        setCourseFile({ 
+          url: result.fileUrl, 
+          name: result.fileName 
+        });
+        
+        // Reload the course data to ensure we have the latest info
+        const updatedCourse = await getCourseById(courseId);
+        if (updatedCourse) {
+          setCourse(updatedCourse);
+        }
+      } else {
+        setFileUploadError(result.error || 'Failed to upload file.');
+      }
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      setFileUploadError('An error occurred during file upload.');
+    } finally {
+      setUploadingFile(false);
+      
+      // Clear the input field so the same file can be selected again
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
 
   if (isRoleLoading || loading) {
     return (
@@ -193,6 +284,99 @@ export default function CoursePage({ params }: CoursePageProps) {
                   <p className="mt-1 text-indigo-200">
                     {new Date(course.updated_at).toLocaleString()}
                   </p>
+                </div>
+              )}
+            </div>
+
+            {/* Course file upload section */}
+            <div className="mt-6 border-t border-indigo-800/30 pt-6">
+              <h3 className="text-lg font-medium text-indigo-100 mb-4">Course Materials</h3>
+              
+              {fileUploadError && (
+                <div className="mb-4 p-3 bg-red-900/30 rounded-lg text-red-300 border border-red-800/30 flex items-start">
+                  <XCircle className="h-5 w-5 text-red-400 mr-2 flex-shrink-0 mt-0.5" />
+                  <span>{fileUploadError}</span>
+                </div>
+              )}
+              
+              {fileUploadSuccess && (
+                <div className="mb-4 p-3 bg-green-900/30 rounded-lg text-green-300 border border-green-800/30 flex items-start">
+                  <CheckCircle className="h-5 w-5 text-green-400 mr-2 flex-shrink-0 mt-0.5" />
+                  <span>{fileUploadSuccess}</span>
+                </div>
+              )}
+              
+              {courseFile ? (
+                <div className="mb-4 p-4 bg-indigo-800/30 rounded-lg border border-indigo-700/30">
+                  <div className="flex justify-between items-center">
+                    <h4 className="text-sm font-medium text-indigo-200 mb-2">Uploaded File</h4>
+                    <div className="px-2 py-0.5 bg-green-600/30 rounded text-xs text-green-300 flex items-center">
+                      <CheckCircle className="h-3 w-3 mr-1" />
+                      Available
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center">
+                    <FileIcon className="h-5 w-5 mr-2 text-indigo-300 flex-shrink-0" />
+                    <div className="text-indigo-300 text-sm truncate mr-2">
+                      {courseFile.name}
+                    </div>
+                  </div>
+                  
+                  <div className="mt-3 flex space-x-2">
+                    <a 
+                      href={courseFile.url} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center px-3 py-1.5 text-xs bg-blue-700/50 text-white font-medium rounded hover:bg-blue-600/50 border border-blue-600/30"
+                    >
+                      <Eye className="h-3 w-3 mr-1" />
+                      View
+                    </a>
+                    <a
+                      href={courseFile.url}
+                      download
+                      className="inline-flex items-center px-3 py-1.5 text-xs bg-indigo-700/50 text-white font-medium rounded hover:bg-indigo-600/50 border border-indigo-600/30"
+                    >
+                      <Download className="h-3 w-3 mr-1" />
+                      Download
+                    </a>
+                    <label
+                      className="inline-flex items-center px-3 py-1.5 text-xs bg-amber-700/50 text-white font-medium rounded hover:bg-amber-600/50 border border-amber-600/30 cursor-pointer"
+                    >
+                      <Upload className="h-3 w-3 mr-1" />
+                      Replace
+                      <input
+                        type="file"
+                        ref={fileInputRef}
+                        onChange={handleFileUpload}
+                        className="hidden"
+                        accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx"
+                      />
+                    </label>
+                  </div>
+                </div>
+              ) : (
+                <div className="mb-4">
+                  <div className="p-4 bg-indigo-800/30 rounded-lg border border-dashed border-indigo-700 text-center">
+                    <FileIcon className="h-8 w-8 mx-auto mb-2 text-indigo-400" />
+                    <p className="text-indigo-300 text-sm mb-3">No file uploaded yet</p>
+                    <label className="inline-flex items-center px-4 py-2 bg-indigo-700/50 text-white font-medium rounded-lg hover:bg-indigo-600/50 border border-indigo-600/30 cursor-pointer transition-colors">
+                      <Upload className="h-4 w-4 mr-2" />
+                      {uploadingFile ? 'Uploading...' : 'Upload Course Materials'}
+                      <input
+                        type="file"
+                        ref={fileInputRef}
+                        onChange={handleFileUpload}
+                        className="hidden"
+                        accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx"
+                        disabled={uploadingFile}
+                      />
+                    </label>
+                    <p className="mt-2 text-xs text-indigo-400">
+                      Supported formats: PDF, DOC, DOCX, PPT, PPTX, XLS, XLSX (Max 10MB)
+                    </p>
+                  </div>
                 </div>
               )}
             </div>

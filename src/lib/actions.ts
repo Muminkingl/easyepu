@@ -48,7 +48,6 @@ import {
   UserData,
   getPollResults,
   PollResults,
-  getUserDataByEmail,
   updateUsername,
   updateGroupClass,
   getCourses,
@@ -60,7 +59,11 @@ import {
   uploadPresentationFile, 
   updateGroupPresentationFile, 
   getGroupPresentationFile,
-  deletePresentationFile
+  deletePresentationFile,
+  uploadCourseFile,
+  getCourseFile,
+  updateCourseFile,
+  deleteCourseFile as deleteCourseFileFromStorage
 } from './storage';
 
 /**
@@ -597,7 +600,7 @@ export async function deleteCourseSectionAction(id: string): Promise<boolean> {
  */
 export async function deleteCourseFileAction(id: string): Promise<boolean> {
   try {
-    return await deleteCourseFile(id);
+    return await deleteCourseFileFromStorage(id);
   } catch (error) {
     console.error('Error in deleteCourseFileAction:', error);
     throw new Error('Failed to delete course file');
@@ -960,6 +963,11 @@ export async function uploadPresentationFileAction(
   file: File
 ): Promise<string | null> {
   try {
+    if (!supabase) {
+      console.error('Supabase client is not initialized');
+      return null;
+    }
+    
     // Check if user is in the group and is the creator
     const { data: membership, error: membershipError } = await supabase
       .from('presentation_group_members')
@@ -1011,6 +1019,95 @@ export async function getGroupPresentationFileAction(
     return await getGroupPresentationFile(groupId);
   } catch (error) {
     console.error('Error in getGroupPresentationFileAction:', error);
+    return null;
+  }
+}
+
+/**
+ * Function to upload a course file
+ * @param userId The user ID (must be an admin and the course creator)
+ * @param courseId The course ID
+ * @param file The file to upload
+ * @returns A promise that resolves to the file URL if successful, or null if failed
+ */
+export async function uploadCourseFileAction(
+  userId: string,
+  courseId: string,
+  file: File
+): Promise<string | null> {
+  try {
+    if (!supabase) {
+      console.error('Supabase client is not initialized');
+      return null;
+    }
+
+    // Check if user is an admin
+    const { data: userData, error: userError } = await supabase
+      .from('user_role')
+      .select('user_id, role')
+      .eq('user_id', userId)
+      .single();
+
+    if (userError || !userData || userData.role !== 'admin') {
+      console.error('User is not an admin');
+      return null;
+    }
+
+    // Check if user is the creator of the course
+    const { data: courseData, error: courseError } = await supabase
+      .from('courses')
+      .select('id, created_by')
+      .eq('id', courseId)
+      .single();
+      
+    if (courseError || !courseData) {
+      console.error('Course not found');
+      return null;
+    }
+    
+    if (courseData.created_by !== userId) {
+      console.error('User is not the creator of this course');
+      return null;
+    }
+
+    // Upload the file to storage
+    const fileUrl = await uploadCourseFile(file, courseId);
+    if (!fileUrl) {
+      return null;
+    }
+
+    // Update the course with the file URL
+    const success = await updateCourseFile(courseId, fileUrl, file.name);
+    if (!success) {
+      // If failed to update the course, try to delete the uploaded file
+      await deleteCourseFileFromStorage(fileUrl);
+      return null;
+    }
+
+    return fileUrl;
+  } catch (error) {
+    console.error('Error in uploadCourseFileAction:', error);
+    return null;
+  }
+}
+
+/**
+ * Function to get a course file
+ * @param courseId The course ID
+ * @returns A promise that resolves to the file URL and name if successful, or null if failed
+ */
+export async function getCourseFileAction(
+  courseId: string
+): Promise<{ url: string; name: string } | null> {
+  try {
+    if (!supabase) {
+      console.error('Supabase client is not initialized');
+      return null;
+    }
+    
+    return await getCourseFile(courseId);
+  } catch (error) {
+    console.error('Error in getCourseFileAction:', error);
     return null;
   }
 } 
