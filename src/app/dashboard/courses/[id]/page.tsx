@@ -192,8 +192,54 @@ export default function CoursePage({ params }: CoursePageProps) {
   const handleFileAction = (fileUrl: string, fileName: string) => {
     if (!fileUrl) return;
 
+    // Check if we're in production or development
+    const isProduction = typeof window !== 'undefined' && window.location.hostname !== 'localhost';
+
+    // Special handling for blob URLs in production
+    if (isProduction && fileUrl.startsWith('blob:')) {
+      // Register the blob URL with our API
+      fetch('/api/blob-download', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          blobUrl: fileUrl,
+          filename: fileName
+        }),
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success && data.downloadUrl) {
+          // Open the download URL in a new tab
+          window.open(data.downloadUrl, '_blank');
+          
+          // Show preview for compatible file types
+          const fileType = determineFileType(fileName);
+          if (['image', 'video', 'audio', 'pdf'].includes(fileType)) {
+            setFileViewerUrl(fileUrl);
+            setFileViewerName(fileName);
+            setFileViewerType(fileType);
+            setShowFileViewer(true);
+          }
+        } else {
+          console.error('Failed to register blob URL:', data.error);
+          alert('Failed to download file. Please try again.');
+        }
+      })
+      .catch(error => {
+        console.error('Error registering blob URL:', error);
+        
+        // Fallback to proxy download API
+        const proxyUrl = `/api/download?url=${encodeURIComponent(fileUrl)}&filename=${encodeURIComponent(fileName)}`;
+        window.open(proxyUrl, '_blank');
+      });
+      
+      return;
+    }
+
     try {
-      // Try direct download for all files first
+      // Standard download for non-blob URLs or local development
       const a = document.createElement('a');
       a.style.display = 'none';
       a.href = fileUrl;
@@ -213,8 +259,9 @@ export default function CoursePage({ params }: CoursePageProps) {
       // Clean up
       setTimeout(() => {
         document.body.removeChild(a);
-        if (fileUrl.startsWith('blob:')) {
-          // Don't revoke URL here as we're using it for preview
+        if (fileUrl.startsWith('blob:') && !isProduction) {
+          // Only revoke in development - in production we're handling it differently
+          // URL.revokeObjectURL(fileUrl);
         }
       }, 100);
     } catch (error) {
@@ -228,42 +275,9 @@ export default function CoursePage({ params }: CoursePageProps) {
         setFileViewerType(fileType);
         setShowFileViewer(true);
       } else {
-        // For other file types, try alternative download methods
-        if (fileUrl.startsWith('blob:')) {
-          try {
-            const xhr = new XMLHttpRequest();
-            xhr.open('GET', fileUrl);
-            xhr.responseType = 'blob';
-            xhr.onload = function() {
-              if (this.status === 200) {
-                const blob = new Blob([this.response]);
-                const url = URL.createObjectURL(blob);
-                
-                // Create a link and click it
-                const a = document.createElement('a');
-                a.style.display = 'none';
-                a.href = url;
-                a.download = fileName || 'download';
-                document.body.appendChild(a);
-                a.click();
-                
-                // Clean up
-                setTimeout(() => {
-                  document.body.removeChild(a);
-                  URL.revokeObjectURL(url);
-                }, 100);
-              }
-            };
-            xhr.send();
-          } catch (e) {
-            console.error('All download attempts failed:', e);
-            alert('Unable to download this file. Please try a different browser.');
-          }
-        } else {
-          // For non-blob URLs, use the proxy API as a last resort
-          const proxyUrl = `/api/download?url=${encodeURIComponent(fileUrl)}&filename=${encodeURIComponent(fileName)}`;
-          window.open(proxyUrl, '_blank');
-        }
+        // For other file types, use the proxy API as a fallback
+        const proxyUrl = `/api/download?url=${encodeURIComponent(fileUrl)}&filename=${encodeURIComponent(fileName)}`;
+        window.open(proxyUrl, '_blank');
       }
     }
   };
@@ -830,21 +844,51 @@ export default function CoursePage({ params }: CoursePageProps) {
                         e.preventDefault();
                         e.stopPropagation();
                         if (fileViewerUrl) {
-                          // Force direct download attempt for all URLs
-                          const a = document.createElement('a');
-                          a.style.display = 'none';
-                          a.href = fileViewerUrl;
-                          a.download = fileViewerName || 'download';
-                          document.body.appendChild(a);
-                          a.click();
+                          // Check if we're in production and dealing with a blob URL
+                          const isProduction = typeof window !== 'undefined' && window.location.hostname !== 'localhost';
                           
-                          // Clean up
-                          setTimeout(() => {
-                            document.body.removeChild(a);
-                            if (fileViewerUrl.startsWith('blob:')) {
-                              URL.revokeObjectURL(fileViewerUrl);
-                            }
-                          }, 100);
+                          if (isProduction && fileViewerUrl.startsWith('blob:')) {
+                            // Use the blob-download API for production environment
+                            fetch('/api/blob-download', {
+                              method: 'POST',
+                              headers: {
+                                'Content-Type': 'application/json',
+                              },
+                              body: JSON.stringify({
+                                blobUrl: fileViewerUrl,
+                                filename: fileViewerName || 'download'
+                              }),
+                            })
+                            .then(response => response.json())
+                            .then(data => {
+                              if (data.success && data.downloadUrl) {
+                                window.open(data.downloadUrl, '_blank');
+                              } else {
+                                console.error('Failed to register blob URL:', data.error);
+                                alert('Failed to download file. Please try again.');
+                              }
+                            })
+                            .catch(error => {
+                              console.error('Error registering blob URL:', error);
+                              alert('Download failed. Please try again later.');
+                            });
+                          } else {
+                            // Regular download for non-blob URLs or local development
+                            const a = document.createElement('a');
+                            a.style.display = 'none';
+                            a.href = fileViewerUrl;
+                            a.download = fileViewerName || 'download';
+                            document.body.appendChild(a);
+                            a.click();
+                            
+                            // Clean up
+                            setTimeout(() => {
+                              document.body.removeChild(a);
+                              if (fileViewerUrl.startsWith('blob:') && !isProduction) {
+                                URL.revokeObjectURL(fileViewerUrl);
+                              }
+                            }, 100);
+                          }
                         }
                       }}
                     >
