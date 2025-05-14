@@ -309,7 +309,7 @@ export default function CoursePage({ params }: CoursePageProps) {
   };
 
   // Add a function to handle file viewing instead of downloading
-  const handleFileAction = (fileUrl: string, fileName: string) => {
+  const handleFileAction = (fileUrl: string, fileName: string, shouldShowPreview: boolean = false) => {
     if (!fileUrl) return;
 
     console.log(`Handling file action for: ${fileName}`);
@@ -336,6 +336,15 @@ export default function CoursePage({ params }: CoursePageProps) {
     }
     
     console.log(`Final filename with extension: ${fileNameWithExtension}`);
+
+    // Show preview if requested and file type is compatible
+    if (shouldShowPreview && ['image', 'video', 'audio', 'pdf'].includes(fileType)) {
+      setFileViewerUrl(fileUrl);
+      setFileViewerName(fileNameWithExtension);
+      setFileViewerType(fileType);
+      setShowFileViewer(true);
+      return;
+    }
 
     try {
       // Create a blob URL for direct download if needed
@@ -364,14 +373,6 @@ export default function CoursePage({ params }: CoursePageProps) {
       document.body.appendChild(a);
       a.click();
       
-      // Also show preview for compatible file types
-      if (['image', 'video', 'audio', 'pdf'].includes(fileType)) {
-        setFileViewerUrl(fileUrl);
-        setFileViewerName(fileNameWithExtension);
-        setFileViewerType(fileType);
-        setShowFileViewer(true);
-      }
-      
       // Clean up
       setTimeout(() => {
         document.body.removeChild(a);
@@ -381,14 +382,6 @@ export default function CoursePage({ params }: CoursePageProps) {
       
       // Fallback for browsers that block downloads
       window.open(fileUrl, '_blank');
-      
-      // Also try to show preview
-      if (['image', 'video', 'audio', 'pdf'].includes(fileType)) {
-        setFileViewerUrl(fileUrl);
-        setFileViewerName(fileNameWithExtension);
-        setFileViewerType(fileType);
-        setShowFileViewer(true);
-      }
     }
   };
 
@@ -683,19 +676,37 @@ export default function CoursePage({ params }: CoursePageProps) {
                                           </div>
                                         </div>
                                         {file.file_url && (
-                                          <button 
-                                            onClick={(e) => {
-                                              e.preventDefault();
-                                              e.stopPropagation();
-                                              if (file.file_url) {
-                                                handleFileAction(file.file_url, file.title);
-                                              }
-                                            }}
-                                            className="ml-2 p-2 hover:bg-indigo-700/50 rounded-full transition-colors"
-                                            title="Download File"
-                                          >
-                                            <Download className="h-5 w-5 text-indigo-300" />
-                                          </button>
+                                          <div className="flex">
+                                            {/* Only show view button for previewable file types */}
+                                            {['image', 'video', 'audio', 'pdf'].includes(file.file_type.toLowerCase()) && (
+                                              <button 
+                                                onClick={(e) => {
+                                                  e.preventDefault();
+                                                  e.stopPropagation();
+                                                  if (file.file_url) {
+                                                    handleFileAction(file.file_url, file.title, true);
+                                                  }
+                                                }}
+                                                className="ml-2 p-2 hover:bg-indigo-700/50 rounded-full transition-colors"
+                                                title="View File"
+                                              >
+                                                <Eye className="h-5 w-5 text-indigo-300" />
+                                              </button>
+                                            )}
+                                            <button 
+                                              onClick={(e) => {
+                                                e.preventDefault();
+                                                e.stopPropagation();
+                                                if (file.file_url) {
+                                                  handleFileAction(file.file_url, file.title, false);
+                                                }
+                                              }}
+                                              className="ml-2 p-2 hover:bg-indigo-700/50 rounded-full transition-colors"
+                                              title="Download File"
+                                            >
+                                              <Download className="h-5 w-5 text-indigo-300" />
+                                            </button>
+                                          </div>
                                         )}
                                       </motion.div>
                                     );
@@ -784,7 +795,7 @@ export default function CoursePage({ params }: CoursePageProps) {
                           e.preventDefault();
                           e.stopPropagation();
                           if (file.file_url) {
-                            handleFileAction(file.file_url, file.title);
+                            handleFileAction(file.file_url, file.title, true);
                           }
                         }}
                         className="flex items-center p-3 w-full text-left bg-indigo-950/50 hover:bg-indigo-800/30 border border-indigo-800/30 hover:border-indigo-700/50 rounded-xl transition-all group"
@@ -981,56 +992,8 @@ export default function CoursePage({ params }: CoursePageProps) {
                         e.stopPropagation();
                         if (fileViewerUrl) {
                           try {
-                            // ALWAYS force PDF for lecture/course materials
-                            let fileType = 'pdf';
-                            
-                            // Only detect for non-course files
-                            if (fileViewerName && 
-                                !fileViewerName.toLowerCase().includes('lecture') && 
-                                !fileViewerName.toLowerCase().includes('course') &&
-                                !fileViewerName.toLowerCase().includes('practical')) {
-                              fileType = fileViewerType || determineFileType(fileViewerName, fileViewerUrl);
-                            }
-                            
-                            // Force PDF extension for educational content
-                            let fileNameWithExtension = fileViewerName || 'download';
-                            if (fileType === 'pdf') {
-                              fileNameWithExtension = fileNameWithExtension.includes('.pdf') 
-                                ? fileNameWithExtension 
-                                : `${fileNameWithExtension}.pdf`;
-                            } else {
-                              fileNameWithExtension = ensureFileExtension(
-                                fileNameWithExtension, 
-                                fileType, 
-                                fileViewerUrl
-                              );
-                            }
-                            
-                            // Create direct download URL that forces file download
-                            let downloadUrl = fileViewerUrl;
-                            
-                            // Adding download parameter to any URL
-                            if (!downloadUrl.includes('download=')) {
-                              downloadUrl = `${downloadUrl}${downloadUrl.includes('?') ? '&' : '?'}download=1`;
-                            }
-                            
-                            // Download using temporary anchor element
-                            const a = document.createElement('a');
-                            a.style.display = 'none';
-                            a.href = downloadUrl;
-                            a.download = fileNameWithExtension;
-                            a.setAttribute('download', fileNameWithExtension);
-                            a.target = '_blank'; // Open in new tab if direct download fails
-                            a.rel = 'noopener noreferrer'; // Prevent sanitization
-                            document.body.appendChild(a);
-                            a.click();
-                            
-                            console.log(`Downloading: ${fileNameWithExtension}, Type: ${fileType}`);
-                            
-                            // Clean up
-                            setTimeout(() => {
-                              document.body.removeChild(a);
-                            }, 100);
+                            // Download file without showing preview
+                            handleFileAction(fileViewerUrl, fileViewerName || 'download', false);
                           } catch (error) {
                             console.error('Download error:', error);
                             // Fallback - just open in new tab
