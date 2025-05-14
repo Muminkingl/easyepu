@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
-import { checkDbHealth } from '@/lib/dbSecurity';
+// Import the security functions that don't have 'use server' directive
 import { getSecuritySummary } from '@/lib/securityMonitor';
 import { checkEnvVars } from '@/lib/security';
+// We'll dynamically import the checkDbHealth function to avoid the 'use server' directive issue
 
 /**
  * GET /api/health
@@ -65,9 +66,43 @@ export async function GET(request: Request) {
     },
   };
 
-  // 1. Check database health
-  const dbHealth = await checkDbHealth();
-  result.components.database = dbHealth;
+  // 1. Check database health using a basic approach to avoid the server-only function
+  try {
+    if (supabase) {
+      const start = Date.now();
+      const { data, error } = await supabase.from('_health').select('*').limit(1);
+      const responseTime = Date.now() - start;
+      
+      if (error) {
+        result.components.database = {
+          status: 'down',
+          issues: [`Database error: ${error.message}`]
+        };
+      } else {
+        // Check response time to determine if it's degraded
+        const issues: string[] = [];
+        let status: 'healthy' | 'degraded' | 'down' = 'healthy';
+        
+        if (responseTime > 500) {
+          status = 'degraded';
+          issues.push(`Slow response time: ${responseTime}ms`);
+        }
+        
+        result.components.database = { status, issues };
+      }
+    } else {
+      result.components.database = {
+        status: 'down',
+        issues: ['Supabase client not initialized']
+      };
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    result.components.database = {
+      status: 'down',
+      issues: [`Connection error: ${errorMessage}`]
+    };
+  }
 
   // 2. Check environment variables
   const requiredVars = [
