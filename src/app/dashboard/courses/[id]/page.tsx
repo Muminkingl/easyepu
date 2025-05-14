@@ -229,73 +229,14 @@ export default function CoursePage({ params }: CoursePageProps) {
     const fileType = fileName.includes('.') ? fileName.split('.').pop()?.toLowerCase() || 'generic' : 'generic';
     const fileNameWithExtension = ensureFileExtension(fileName, fileType, fileUrl);
 
-    // Check if we're in production or development
-    const isProduction = typeof window !== 'undefined' && window.location.hostname !== 'localhost';
-
-    // Special handling for blob URLs in production
-    if (isProduction && fileUrl.startsWith('blob:')) {
-      // For blob URLs, use XMLHttpRequest instead of fetch (which doesn't support blob URLs in some environments)
-      const xhr = new XMLHttpRequest();
-      xhr.open('GET', fileUrl, true);
-      xhr.responseType = 'blob';
-      
-      xhr.onload = function() {
-        if (this.status === 200) {
-          const blob = this.response;
-          
-          // Create a FormData object to send the blob
-          const formData = new FormData();
-          formData.append('file', blob, fileNameWithExtension);
-          
-          // Use the download API to handle the blob data
-          fetch('/api/download', {
-            method: 'POST',
-            body: formData
-          })
-          .then(response => response.json())
-          .then(data => {
-            if (data.success && data.downloadUrl) {
-              // Open the download URL in a new tab
-              window.open(data.downloadUrl, '_blank');
-              
-              // Show preview for compatible file types
-              const fileType = determineFileType(fileNameWithExtension);
-              if (['image', 'video', 'audio', 'pdf'].includes(fileType)) {
-                setFileViewerUrl(fileUrl);
-                setFileViewerName(fileNameWithExtension);
-                setFileViewerType(fileType);
-                setShowFileViewer(true);
-              }
-            } else {
-              console.error('Failed to process file download:', data.error);
-              alert('Failed to download file. Please try again.');
-            }
-          })
-          .catch(error => {
-            console.error('Error processing file download:', error);
-            alert('Failed to download file. Please try again later.');
-          });
-        } else {
-          console.error('Failed to load blob:', this.status);
-          alert('Failed to load the file. Please try again.');
-        }
-      };
-      
-      xhr.onerror = function() {
-        console.error('XHR error for blob URL');
-        alert('Error accessing the file. Please try again later.');
-      };
-      
-      xhr.send();
-      return;
-    }
-
+    // Simple direct download approach that works for most cases
     try {
-      // Standard download for non-blob URLs or local development
+      // Create a hidden anchor element for download
       const a = document.createElement('a');
       a.style.display = 'none';
       a.href = fileUrl;
       a.download = fileNameWithExtension;
+      a.target = '_blank'; // Open in new tab if direct download fails
       document.body.appendChild(a);
       a.click();
       
@@ -311,25 +252,20 @@ export default function CoursePage({ params }: CoursePageProps) {
       // Clean up
       setTimeout(() => {
         document.body.removeChild(a);
-        if (fileUrl.startsWith('blob:') && !isProduction) {
-          // Only revoke in development - in production we're handling it differently
-          // URL.revokeObjectURL(fileUrl);
-        }
       }, 100);
     } catch (error) {
       console.error('File handling error:', error);
       
-      // Show preview as fallback if download fails
+      // Fallback for browsers that block downloads
+      window.open(fileUrl, '_blank');
+      
+      // Also try to show preview
       const fileType = determineFileType(fileNameWithExtension);
       if (['image', 'video', 'audio', 'pdf'].includes(fileType)) {
         setFileViewerUrl(fileUrl);
         setFileViewerName(fileNameWithExtension);
         setFileViewerType(fileType);
         setShowFileViewer(true);
-      } else {
-        // For other file types, use the proxy API as a fallback
-        const proxyUrl = `/api/download?url=${encodeURIComponent(fileUrl)}&filename=${encodeURIComponent(fileNameWithExtension)}`;
-        window.open(proxyUrl, '_blank');
       }
     }
   };
@@ -896,71 +832,29 @@ export default function CoursePage({ params }: CoursePageProps) {
                         e.preventDefault();
                         e.stopPropagation();
                         if (fileViewerUrl) {
-                          // Check if we're in production and dealing with a blob URL
-                          const isProduction = typeof window !== 'undefined' && window.location.hostname !== 'localhost';
-                          
-                          if (isProduction && fileViewerUrl.startsWith('blob:')) {
-                            // For blob URLs in production, use XMLHttpRequest instead of fetch
-                            const xhr = new XMLHttpRequest();
-                            xhr.open('GET', fileViewerUrl, true);
-                            xhr.responseType = 'blob';
-                            
-                            xhr.onload = function() {
-                              if (this.status === 200) {
-                                const blob = this.response;
-                                
-                                // Create a FormData object to send the blob
-                                const formData = new FormData();
-                                const fileNameWithExtension = ensureFileExtension(fileViewerName || 'download', fileViewerType || 'generic', fileViewerUrl);
-                                formData.append('file', blob, fileNameWithExtension);
-                                
-                                // Use the download API to handle the blob data
-                                fetch('/api/download', {
-                                  method: 'POST',
-                                  body: formData
-                                })
-                                .then(response => response.json())
-                                .then(data => {
-                                  if (data.success && data.downloadUrl) {
-                                    window.open(data.downloadUrl, '_blank');
-                                  } else {
-                                    console.error('Failed to process file download:', data.error);
-                                    alert('Failed to download file. Please try again.');
-                                  }
-                                })
-                                .catch(error => {
-                                  console.error('Error processing file download:', error);
-                                  alert('Failed to download file. Please try again later.');
-                                });
-                              } else {
-                                console.error('Failed to load blob:', this.status);
-                                alert('Failed to load the file. Please try again.');
-                              }
-                            };
-                            
-                            xhr.onerror = function() {
-                              console.error('XHR error for blob URL');
-                              alert('Error accessing the file. Please try again later.');
-                            };
-                            
-                            xhr.send();
-                          } else {
-                            // Regular download for non-blob URLs or local development
+                          try {
+                            // Simple direct download approach
                             const a = document.createElement('a');
                             a.style.display = 'none';
                             a.href = fileViewerUrl;
-                            const fileNameWithExtension = ensureFileExtension(fileViewerName || 'download', fileViewerType || 'generic', fileViewerUrl);
+                            const fileNameWithExtension = ensureFileExtension(
+                              fileViewerName || 'download', 
+                              fileViewerType || 'generic', 
+                              fileViewerUrl
+                            );
                             a.download = fileNameWithExtension;
+                            a.target = '_blank'; // Open in new tab if direct download fails
                             document.body.appendChild(a);
                             a.click();
                             
                             // Clean up
                             setTimeout(() => {
                               document.body.removeChild(a);
-                              if (fileViewerUrl.startsWith('blob:') && !isProduction) {
-                                URL.revokeObjectURL(fileViewerUrl);
-                              }
                             }, 100);
+                          } catch (error) {
+                            console.error('Download error:', error);
+                            // Fallback - just open in new tab
+                            window.open(fileViewerUrl, '_blank');
                           }
                         }
                       }}
