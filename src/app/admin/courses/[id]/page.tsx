@@ -466,39 +466,40 @@ export default function CoursePage({ params }: CoursePageProps) {
                       </div>
                     </div>
                     
-                  <div className="mt-3 flex space-x-2">
-                    <a 
-                      href={courseFile.url} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center px-3 py-1.5 text-xs bg-blue-700/50 text-white font-medium rounded hover:bg-blue-600/50 border border-blue-600/30"
-                    >
-                      <Eye className="h-3 w-3 mr-1" />
-                      View
-                    </a>
-                    <a
-                      href={courseFile.url}
-                      download={!courseFile.url.includes('drive.google.com')}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center px-3 py-1.5 text-xs bg-indigo-700/50 text-white font-medium rounded hover:bg-indigo-600/50 border border-indigo-600/30"
-                    >
-                      <Download className="h-3 w-3 mr-1" />
-                      {courseFile.url.includes('drive.google.com') ? 'Open' : 'Download'}
-                    </a>
-                    <label
-                      className="inline-flex items-center px-3 py-1.5 text-xs bg-amber-700/50 text-white font-medium rounded hover:bg-amber-600/50 border border-amber-600/30 cursor-pointer"
-                    >
-                      <Upload className="h-3 w-3 mr-1" />
-                      Replace
-                      <input
-                        type="file"
-                        ref={fileInputRef}
-                        onChange={handleFileUpload}
-                        className="hidden"
-                        accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx"
-                      />
-                    </label>
+                    <div className="mt-3 flex space-x-2">
+                      <a 
+                        href={courseFile.url} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center px-3 py-1.5 text-xs bg-blue-700/50 text-white font-medium rounded hover:bg-blue-600/50 border border-blue-600/30"
+                      >
+                        <Eye className="h-3 w-3 mr-1" />
+                        View
+                      </a>
+                      <a
+                        href={courseFile.url}
+                        download={!courseFile.url.includes('drive.google.com')}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center px-3 py-1.5 text-xs bg-indigo-700/50 text-white font-medium rounded hover:bg-indigo-600/50 border border-indigo-600/30"
+                      >
+                        <Download className="h-3 w-3 mr-1" />
+                        {courseFile.url.includes('drive.google.com') ? 'Open' : 'Download'}
+                      </a>
+                      <label
+                        className="inline-flex items-center px-3 py-1.5 text-xs bg-amber-700/50 text-white font-medium rounded hover:bg-amber-600/50 border border-amber-600/30 cursor-pointer"
+                      >
+                        <Upload className="h-3 w-3 mr-1" />
+                        Replace
+                        <input
+                          type="file"
+                          ref={fileInputRef}
+                          onChange={handleFileUpload}
+                          className="hidden"
+                          accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx"
+                        />
+                      </label>
+                    </div>
                   </div>
                 </div>
               ) : (
