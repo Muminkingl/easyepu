@@ -308,6 +308,13 @@ export default function CoursePage({ params }: CoursePageProps) {
     }
   };
 
+  // Add iOS detection function
+  const isIOS = () => {
+    if (typeof window === 'undefined') return false;
+    return /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+           (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  };
+
   // Add a function to handle file viewing instead of downloading
   const handleFileAction = (fileUrl: string, fileName: string) => {
     if (!fileUrl) return;
@@ -327,14 +334,18 @@ export default function CoursePage({ params }: CoursePageProps) {
     
     console.log(`Determined file type: ${fileType}`);
     
-    // For PDFs and media files, just open in a new tab
-    if (['pdf', 'image', 'video', 'audio'].includes(fileType)) {
+    // Special handling for iOS Safari which has issues with blob URLs
+    const isIOSDevice = isIOS();
+    console.log(`Is iOS device: ${isIOSDevice}`);
+
+    // For PDFs and media files on non-iOS, open in a new tab
+    if (['pdf', 'image', 'video', 'audio'].includes(fileType) && !isIOSDevice) {
       console.log('Opening file in new tab:', fileUrl);
       window.open(fileUrl, '_blank');
       return;
     }
-    
-    // For other file types, try to download
+
+    // Special handling for iOS devices or non-media files
     try {
       // Force PDF extension for most education files
       let fileNameWithExtension = fileName;
@@ -346,6 +357,23 @@ export default function CoursePage({ params }: CoursePageProps) {
       
       console.log(`Final filename with extension: ${fileNameWithExtension}`);
       
+      // For iOS, we need to handle differently depending on type
+      if (isIOSDevice) {
+        if (['pdf', 'image'].includes(fileType)) {
+          // For PDFs and images on iOS, we'll use a modal preview if available
+          setFileViewerUrl(fileUrl);
+          setFileViewerName(fileNameWithExtension);
+          setFileViewerType(fileType);
+          setShowFileViewer(true);
+          return;
+        } else if (['video', 'audio'].includes(fileType)) {
+          // For media on iOS, still try opening in a new tab
+          window.open(fileUrl, '_blank');
+          return;
+        }
+      }
+      
+      // For other files and cases, try download
       // Create a blob URL for direct download if needed
       let downloadUrl = fileUrl;
       
@@ -974,8 +1002,14 @@ export default function CoursePage({ params }: CoursePageProps) {
                         e.preventDefault();
                         e.stopPropagation();
                         if (fileViewerUrl) {
-                          // Simply open in a new tab
-                          window.open(fileViewerUrl, '_blank');
+                          // Handle iOS differently
+                          if (isIOS()) {
+                            // If already in the viewer, show download instructions for iOS
+                            alert("To save this file on iOS, tap and hold the document, then select 'Download' or 'Save to Files'");
+                          } else {
+                            // For other platforms, open in new tab
+                            window.open(fileViewerUrl, '_blank');
+                          }
                         }
                       }}
                     >
