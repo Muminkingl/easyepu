@@ -338,8 +338,18 @@ export default function CoursePage({ params }: CoursePageProps) {
     const isIOSDevice = isIOS();
     console.log(`Is iOS device: ${isIOSDevice}`);
 
-    // For PDFs and media files on non-iOS, open in a new tab
-    if (['pdf', 'image', 'video', 'audio'].includes(fileType) && !isIOSDevice) {
+    // For PDF files, always use the viewer which works on all platforms
+    if (fileType === 'pdf') {
+      console.log('Opening PDF in viewer:', fileUrl);
+      setFileViewerUrl(fileUrl);
+      setFileViewerName(fileName.includes('.pdf') ? fileName : `${fileName}.pdf`);
+      setFileViewerType('pdf');
+      setShowFileViewer(true);
+      return;
+    }
+
+    // For images, videos and audio on non-iOS, open in a new tab
+    if (['image', 'video', 'audio'].includes(fileType) && !isIOSDevice) {
       console.log('Opening file in new tab:', fileUrl);
       window.open(fileUrl, '_blank');
       return;
@@ -359,8 +369,8 @@ export default function CoursePage({ params }: CoursePageProps) {
       
       // For iOS, we need to handle differently depending on type
       if (isIOSDevice) {
-        if (['pdf', 'image'].includes(fileType)) {
-          // For PDFs and images on iOS, we'll use a modal preview if available
+        if (['image'].includes(fileType)) {
+          // For images on iOS, we'll use a modal preview if available
           setFileViewerUrl(fileUrl);
           setFileViewerName(fileNameWithExtension);
           setFileViewerType(fileType);
@@ -923,28 +933,25 @@ export default function CoursePage({ params }: CoursePageProps) {
             {/* File viewer content */}
             <div className={`w-full ${isFullscreen ? 'h-[calc(100vh-56px)]' : 'h-[60vh]'} bg-gray-900/50`}>
               {fileViewerType === 'pdf' && (
-                <div className="w-full h-full flex flex-col items-center justify-center p-4">
-                  {/* Using object tag instead of iframe to avoid CSP issues with blob URLs */}
-                  <object 
-                    data={fileViewerUrl} 
-                    type="application/pdf"
-                    className="w-full h-full" 
-                    aria-label={fileViewerName || "PDF Document"}
-                  >
-                    <div className="bg-indigo-900/50 p-6 rounded-lg text-center">
-                      <p className="text-white mb-4">Unable to display PDF directly in this viewer.</p>
-                      <button
-                        onClick={(e) => {
-                          e.preventDefault();
-                          window.open(fileViewerUrl, '_blank');
-                        }}
-                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg flex items-center mx-auto"
-                      >
-                        <ExternalLink className="h-4 w-4 mr-2" />
-                        Open PDF in New Tab
-                      </button>
+                <div className="w-full h-full flex flex-col items-center justify-center p-0">
+                  {/* Custom PDF viewer that works on all platforms including iOS */}
+                  <iframe 
+                    src={fileViewerUrl}
+                    className="w-full h-full border-0" 
+                    title={fileViewerName || "PDF Document"}
+                    sandbox="allow-same-origin allow-scripts"
+                    loading="eager"
+                    importance="high"
+                  />
+                  
+                  {/* iOS download instructions */}
+                  {isIOS() && (
+                    <div className="absolute bottom-0 left-0 right-0 bg-indigo-900/80 backdrop-blur-sm p-3 text-center">
+                      <p className="text-white text-sm">
+                        To save this PDF on iOS, tap and hold on the document, then select "Download" or "Share" → "Save to Files"
+                      </p>
                     </div>
-                  </object>
+                  )}
                 </div>
               )}
               
@@ -1004,8 +1011,8 @@ export default function CoursePage({ params }: CoursePageProps) {
                         if (fileViewerUrl) {
                           // Handle iOS differently
                           if (isIOS()) {
-                            // If already in the viewer, show download instructions for iOS
-                            alert("To save this file on iOS, tap and hold the document, then select 'Download' or 'Save to Files'");
+                            // Try to open in Safari for iOS
+                            window.location.href = fileViewerUrl;
                           } else {
                             // For other platforms, open in new tab
                             window.open(fileViewerUrl, '_blank');
@@ -1014,7 +1021,7 @@ export default function CoursePage({ params }: CoursePageProps) {
                       }}
                     >
                       <Download className="h-4 w-4 mr-2" />
-                      Download
+                      {isIOS() ? "Open in Safari" : "Download"}
                     </button>
                     
                     <button
