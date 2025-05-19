@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { getAnnouncements, Announcement, getPollByAnnouncementId } from '@/lib/supabase';
 import { useUserRole } from '@/hooks/useUserRole';
 import { deleteAnnouncementAction } from '@/lib/actions';
+import Maintenance from '@/components/Maintenance';
 import { 
   Bell, 
   ChevronLeft, 
@@ -27,6 +28,9 @@ export default function AnnouncementsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [deleting, setDeleting] = useState<string | null>(null);
+
+  // Maintenance mode
+  const maintenanceMode = true; // Set this to false to disable maintenance mode
 
   useEffect(() => {
     async function loadAnnouncements() {
@@ -119,6 +123,11 @@ export default function AnnouncementsPage() {
         </div>
       </div>
     );
+  }
+
+  // If in maintenance mode, show maintenance screen
+  if (maintenanceMode) {
+    return <Maintenance returnUrl="/admin" returnText="Return to Admin Dashboard" />;
   }
 
   return (

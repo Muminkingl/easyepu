@@ -1,7 +1,7 @@
 'use client';
 
 import { useUser } from "@clerk/nextjs";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useUserData } from "@/hooks/useUserData";
 import { checkEnvironmentVariables } from "@/lib/debugUtils";
@@ -15,12 +15,14 @@ export default function Dashboard() {
   const { user, isLoaded, isSignedIn } = useUser();
   const { userData, isLoading: isUserDataLoading, isAdmin, error: userDataError } = useUserData();
   const router = useRouter();
+  const pathname = usePathname();
   const [loading, setLoading] = useState(true);
   const [envError, setEnvError] = useState(false);
   const [unreadAnnouncementsCount, setUnreadAnnouncementsCount] = useState(0);
   const [coursesCount, setCoursesCount] = useState(0);
   const [isLoadingCourses, setIsLoadingCourses] = useState(true);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
+  const [semesterRequired, setSemesterRequired] = useState(false);
   const { t, dir } = useTranslations();
   
   // Check environment variables on component mount
@@ -43,11 +45,19 @@ export default function Dashboard() {
         return;
       }
       
-      // No longer redirecting admins away from student dashboard
-      // Just set loading to false and allow access
+      // Check if semester is selected - require for all users including admins
+      if (!isUserDataLoading && userData && !userData.semester_selected) {
+        // Only show the message once user data is fully loaded
+        setSemesterRequired(true);
+        // If on dashboard home, redirect to profile to set semester
+        if (pathname === '/dashboard') {
+          router.push('/dashboard/profile');
+        }
+      }
+      
       setLoading(false);
     }
-  }, [isLoaded, isSignedIn, user, router, isUserDataLoading, isAdmin]);
+  }, [isLoaded, isSignedIn, user, router, pathname, userData, isUserDataLoading]);
 
   // Fetch courses when component loads
   useEffect(() => {
@@ -56,7 +66,16 @@ export default function Dashboard() {
         try {
           setIsLoadingCourses(true);
           const courses = await getCourses();
-          setCoursesCount(courses.length);
+          
+          // Filter courses based on user's semester if available
+          if (userData?.semester) {
+            const semesterCourses = courses.filter(course => 
+              course.semester === userData.semester || !course.semester // Show courses with no semester set or matching the user's semester
+            );
+            setCoursesCount(semesterCourses.length);
+          } else {
+            setCoursesCount(courses.length);
+          }
         } catch (error) {
           console.error("Error fetching courses:", error);
         } finally {
@@ -66,7 +85,7 @@ export default function Dashboard() {
     };
 
     fetchCourses();
-  }, [loading, isLoaded, isSignedIn]);
+  }, [loading, isLoaded, isSignedIn, userData?.semester]);
 
   // Listen for announcement updates
   useEffect(() => {
@@ -162,6 +181,20 @@ export default function Dashboard() {
           <div className={`bg-yellow-900/50 ${dir === 'rtl' ? 'border-r-4' : 'border-l-4'} border-yellow-500 text-yellow-200 p-4 mb-6 rounded shadow-sm backdrop-blur-sm`} role="alert">
           <p className="font-bold">{t('dashboard.alerts.dbConnectionIssue')}</p>
           <p>{t('dashboard.alerts.defaultRole')}</p>
+        </div>
+      )}
+      
+      {/* Semester warning - only show for non-admins */}
+      {semesterRequired && !isAdmin && (
+        <div className={`bg-indigo-900/50 ${dir === 'rtl' ? 'border-r-4' : 'border-l-4'} border-indigo-500 text-indigo-200 p-4 mb-6 rounded shadow-sm backdrop-blur-sm animate-pulse`} role="alert">
+          <p className="font-bold">{t('profile.semesterInfo.locked')}</p>
+          <p>{t('profile.semesterInfo.requiredMessage')}</p>
+          <a 
+            href="/dashboard/profile" 
+            className="mt-3 inline-block px-4 py-2 bg-indigo-700/50 hover:bg-indigo-600/50 text-white rounded-md transition-colors"
+          >
+            {t('poll.updateProfile')}
+          </a>
         </div>
       )}
       

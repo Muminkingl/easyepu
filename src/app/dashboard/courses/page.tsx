@@ -14,24 +14,33 @@ import {
   ExternalLink,
   RefreshCw
 } from 'lucide-react';
-import { getCourses, Course } from '@/lib/supabase';
+import { getCourses, Course, getUserData } from '@/lib/supabase';
 import { useTranslations } from '@/lib/i18n';
+import { useSemesterCheck } from '@/hooks/useSemesterCheck.tsx';
+import { useUser } from '@clerk/nextjs';
 
 // Create a fetcher function for SWR
-const coursesFetcher = async () => {
-  const data = await getCourses();
+const coursesFetcher = async (key: string, userId: string) => {
+  const data = await getCourses(userId);
   return data;
 };
 
 export default function CoursesPage() {
   const { t, dir } = useTranslations();
+  const { user } = useUser();
+  const { semesterSelected, isChecking, SemesterLock } = useSemesterCheck();
+  const [userSemester, setUserSemester] = useState<number | null>(null);
   
   // Use SWR for data fetching with auto-refresh
-  const { data, error, mutate } = useSWR('courses', coursesFetcher, {
-    refreshInterval: 30000, // Auto-refresh every 30 seconds
-    revalidateOnFocus: true,
-    revalidateOnReconnect: true,
-  });
+  const { data, error, mutate } = useSWR(
+    user ? ['courses', user.id] : null, 
+    ([key, userId]) => coursesFetcher(key, userId),
+    {
+      refreshInterval: 30000, // Auto-refresh every 30 seconds
+      revalidateOnFocus: true,
+      revalidateOnReconnect: true,
+    }
+  );
   
   const [filteredCourses, setFilteredCourses] = useState<Course[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -54,6 +63,24 @@ export default function CoursesPage() {
     { id: 'all', name: t('coursesPage.categories.all') },
     { id: 'saved', name: t('coursesPage.categories.saved') }
   ];
+
+  // Fetch user data and their semester when component mounts
+  useEffect(() => {
+    const fetchUserSemester = async () => {
+      if (user) {
+        try {
+          const userData = await getUserData(user.id);
+          if (userData && userData.semester !== null) {
+            setUserSemester(userData.semester);
+          }
+        } catch (error) {
+          console.error('Error fetching user semester:', error);
+        }
+      }
+    };
+    
+    fetchUserSemester();
+  }, [user]);
 
   useEffect(() => {
     // Add scroll event listener
@@ -241,6 +268,25 @@ export default function CoursesPage() {
     );
   };
 
+  // Show loading state if still checking semester requirements
+  if (isChecking) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin h-12 w-12 border-4 border-indigo-500 rounded-full border-t-transparent"></div>
+      </div>
+    );
+  }
+  
+  // If semester is not selected, show the lock screen
+  if (!semesterSelected) {
+    return (
+      <div className="min-h-screen p-6">
+        <SemesterLock />
+      </div>
+    );
+  }
+  
+  // Regular component render below for users who have selected a semester
   return (
     <div className={`min-h-screen px-4 py-6 ${sidebarCollapsed ? 'sm:pl-20' : 'sm:pl-72'} transition-all duration-300`}>
       {/* Header with back button and title */}
@@ -261,6 +307,11 @@ export default function CoursesPage() {
                 </button>
               </Link>
               <h1 className="text-2xl font-semibold text-white">{t('coursesPage.title')}</h1>
+              {semesterSelected && (
+                <span className="ml-3 px-3 py-1 bg-indigo-800/50 text-indigo-300 text-sm rounded-full">
+                  {t('semester')} {userSemester || '-'}
+                </span>
+              )}
             </div>
           </div>
         </div>

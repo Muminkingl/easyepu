@@ -13,7 +13,7 @@ export const supabase = isSupabaseConfigured
   : null;
 
 // Types for user roles
-export type UserRole = 'admin' | 'student';
+export type UserRole = 'owner' | 'admin' | 'student';
 
 // Type for user data
 export type UserData = {
@@ -23,6 +23,8 @@ export type UserData = {
   phone_number?: string | null;
   gender?: string | null;
   group_class?: string | null;
+  semester?: number | null;
+  semester_selected?: boolean; // Flag indicating if semester was explicitly selected by user
   role?: UserRole;
   created_at?: string;
 };
@@ -110,6 +112,7 @@ export type Course = {
   instructor_title: string | null;
   instructor_email: string | null;
   instructor_image: string | null;
+  semester: number | null;
 };
 
 // Type for course sections
@@ -156,6 +159,7 @@ export type PresentationSection = {
   created_at: string;
   created_by: string;
   active: boolean;
+  semester: number | null;
 };
 
 export type PresentationGroup = {
@@ -180,12 +184,12 @@ export type PresentationGroupMember = {
 /**
  * Check if a user has admin privileges (case-insensitive)
  * @param userRole The role to check
- * @returns True if the user is an admin
+ * @returns True if the user is an admin or owner
  */
 export function isAdminRole(userRole?: string | null): boolean {
   if (!userRole) return false;
   const normalizedRole = userRole.toLowerCase().trim();
-  return normalizedRole === 'admin';
+  return normalizedRole === 'admin' || normalizedRole === 'owner';
 }
 
 /**
@@ -253,7 +257,7 @@ export async function getUserData(clerkId: string): Promise<UserData | null> {
 }
 
 // Function to get all users from Supabase
-export async function getAllUsers(): Promise<UserData[]> {
+export async function getAllUsers(adminSemester?: number | null, userRole?: string): Promise<UserData[]> {
   try {
     // Check if Supabase is configured
     if (!supabase) {
@@ -261,10 +265,17 @@ export async function getAllUsers(): Promise<UserData[]> {
       return [];
     }
     
-    const { data, error } = await supabase
+    let query = supabase
       .from('users')
       .select('*')
       .order('created_at', { ascending: false });
+    
+    // Filter by semester if provided and user is not an owner
+    if (adminSemester !== undefined && adminSemester !== null && userRole !== 'owner') {
+      query = query.eq('semester', adminSemester);
+    }
+    
+    const { data, error } = await query;
     
     if (error) {
       console.error('Error fetching all users:', error.message);
@@ -681,18 +692,79 @@ export async function deleteAnnouncement(id: string): Promise<boolean> {
 }
 
 // Function to get all courses
-export async function getCourses(): Promise<Course[]> {
+export async function getCourses(userId?: string, userRole?: string): Promise<Course[]> {
   try {
     if (!supabase) {
       console.warn('Supabase not configured: Missing environment variables.');
       return [];
     }
 
-    const { data, error } = await supabase
+    // For owners, return all courses without semester filtering
+    if (userRole === 'owner') {
+      const { data, error } = await supabase
+        .from('courses')
+        .select('*')
+        .eq('active', true)
+        .order('title', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching courses for owner:', error);
+        return [];
+      }
+
+      return data || [];
+    }
+
+    // Regular semester-based filtering for non-owners
+    // Get user's semester if userId is provided
+    let userSemester: number | null = null;
+    if (userId) {
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('semester, role')
+        .eq('clerk_id', userId)
+        .single();
+      
+      if (userError) {
+        console.error('Error fetching user semester:', userError);
+      } else {
+        userSemester = userData?.semester || null;
+        
+        // If user has owner role, return all courses
+        if (userData?.role === 'owner') {
+          const { data, error } = await supabase
+            .from('courses')
+            .select('*')
+            .eq('active', true)
+            .order('title', { ascending: true });
+
+          if (error) {
+            console.error('Error fetching courses for owner:', error);
+            return [];
+          }
+
+          return data || [];
+        }
+      }
+      
+      // If user has no semester selected and is not owner, return empty array
+      if (userSemester === null && userRole !== 'owner') {
+        console.warn('User has no semester selected');
+        return [];
+      }
+    }
+
+    let query = supabase
       .from('courses')
       .select('*')
-      .eq('active', true)
-      .order('title', { ascending: true });
+      .eq('active', true);
+    
+    // Filter by user's semester if available and not owner
+    if (userSemester !== null && userRole !== 'owner') {
+      query = query.eq('semester', userSemester);
+    }
+    
+    const { data, error } = await query.order('title', { ascending: true });
 
     if (error) {
       console.error('Error fetching courses:', error);
@@ -708,16 +780,54 @@ export async function getCourses(): Promise<Course[]> {
 }
 
 // Function to get all courses for admin, including inactive ones
-export async function getAdminCourses(): Promise<Course[]> {
+export async function getAdminCourses(adminId: string): Promise<Course[]> {
   try {
     if (!supabase) {
       console.warn('Supabase not configured: Missing environment variables.');
       return [];
     }
 
+    // First check if user is an owner - owners see all courses
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('semester, role')
+      .eq('clerk_id', adminId)
+      .single();
+    
+    if (userError) {
+      console.error('Error fetching admin data:', userError);
+      return [];
+    }
+    
+    // If admin is an owner, return all courses without semester filtering
+    if (userData?.role === 'owner') {
+      const { data, error } = await supabase
+        .from('courses')
+        .select('*')
+        .order('title', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching all courses for owner:', error);
+        return [];
+      }
+
+      return data || [];
+    }
+    
+    // For regular admins, continue with semester filtering
+    const adminSemester = userData?.semester || null;
+    
+    // If admin has no semester selected, return empty array
+    if (adminSemester === null) {
+      console.warn('Admin has no semester selected');
+      return [];
+    }
+
+    // Filter courses by admin's semester
     const { data, error } = await supabase
       .from('courses')
       .select('*')
+      .eq('semester', adminSemester)
       .order('title', { ascending: true });
 
     if (error) {
@@ -770,15 +880,14 @@ export async function createCourse(
   instructorName: string | null = null,
   instructorTitle: string | null = null,
   instructorEmail: string | null = null,
-  instructorImage: string | null = null
+  instructorImage: string | null = null,
+  semester: number = 1
 ): Promise<string | null> {
   try {
     if (!supabase) {
       console.warn('Supabase not configured: Missing environment variables.');
       return null;
     }
-
-    // console.log('Creating course with creator ID:', createdBy);
 
     // Get user role first to check if admin
     const { data: userData, error: userError } = await supabase
@@ -809,7 +918,8 @@ export async function createCourse(
         instructor_name: instructorName,
         instructor_title: instructorTitle,
         instructor_email: instructorEmail,
-        instructor_image: instructorImage
+        instructor_image: instructorImage,
+        semester
       })
       .select('id')
       .single();
@@ -1810,7 +1920,8 @@ export async function createPresentationSection(
   adminId: string,
   title: string,
   maxMembers: number,
-  description: string | null = null
+  description: string | null = null,
+  semester: number | null = null
 ): Promise<number | null> {
   try {
     if (!supabase) {
@@ -1825,6 +1936,12 @@ export async function createPresentationSection(
       return null;
     }
 
+    // Get admin's selected semester if not provided
+    if (semester === null) {
+      const userData = await getUserData(adminId);
+      semester = userData?.semester || null;
+    }
+
     const { data, error } = await supabase
       .from('presentation_sections')
       .insert({
@@ -1832,6 +1949,7 @@ export async function createPresentationSection(
         description,
         max_members: maxMembers,
         created_by: adminId,
+        semester,
       })
       .select('id')
       .single();
@@ -1850,7 +1968,7 @@ export async function createPresentationSection(
 }
 
 // Function to get all presentation sections
-export async function getPresentationSections(activeOnly: boolean = true): Promise<PresentationSection[]> {
+export async function getPresentationSections(activeOnly: boolean = true, semester: number | null = null, userRole?: string): Promise<PresentationSection[]> {
   try {
     if (!supabase) {
       console.warn('Supabase not configured: Missing environment variables.');
@@ -1864,6 +1982,11 @@ export async function getPresentationSections(activeOnly: boolean = true): Promi
     
     if (activeOnly) {
       query = query.eq('active', true);
+    }
+    
+    // Filter by semester if provided and user is not an owner
+    if (semester !== null && userRole !== 'owner') {
+      query = query.eq('semester', semester);
     }
 
     const { data, error } = await query;
@@ -1895,10 +2018,24 @@ export async function createPresentationGroup(
       return null;
     }
 
-    // Get the section to check max members
+    // First get user's semester
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('semester')
+      .eq('clerk_id', userId)
+      .single();
+
+    if (userError) {
+      console.error('Error fetching user data:', userError);
+      return null;
+    }
+
+    const userSemester = userData?.semester || null;
+
+    // Get the section to check max members and semester
     const { data: section, error: sectionError } = await supabase
       .from('presentation_sections')
-      .select('max_members')
+      .select('max_members, semester')
       .eq('id', sectionId)
       .single();
 
@@ -1909,6 +2046,12 @@ export async function createPresentationGroup(
 
     if (!section) {
       console.error('Section not found');
+      return null;
+    }
+
+    // Check if the user's semester matches the section's semester
+    if (userSemester !== section.semester) {
+      console.error(`Semester mismatch: User semester ${userSemester} doesn't match section semester ${section.semester}`);
       return null;
     }
 
@@ -1947,7 +2090,7 @@ export async function createPresentationGroup(
     const autoGroupName = `G${highestGroupNum + 1}`;
 
     // Start a transaction to insert group and members
-    const { data: userData } = await supabase
+    const { data: userProfileData } = await supabase
       .from('users')
       .select('email, username')
       .eq('clerk_id', userId)
@@ -1980,8 +2123,8 @@ export async function createPresentationGroup(
     const creatorMember = {
       group_id: groupId,
       user_id: userId,
-      name: userData?.username || 'Unknown User',
-      email: userData?.email || null,
+      name: userProfileData?.username || 'Unknown User',
+      email: userProfileData?.email || null,
       is_creator: true,
     };
 
@@ -2025,6 +2168,39 @@ export async function getPresentationGroupsBySection(sectionId: number): Promise
     if (!supabase) {
       console.warn('Supabase not configured: Missing environment variables.');
       return [];
+    }
+
+    // Get the section's semester
+    const { data: section, error: sectionError } = await supabase
+      .from('presentation_sections')
+      .select('semester')
+      .eq('id', sectionId)
+      .single();
+
+    if (sectionError) {
+      console.error('Error fetching section:', sectionError);
+      return [];
+    }
+
+    const sectionSemester = section?.semester || null;
+
+    // Get current auth context to check user's semester
+    const { data: authData } = await supabase.auth.getSession();
+    if (authData?.session?.user?.id) {
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('semester')
+        .eq('clerk_id', authData.session.user.id)
+        .single();
+        
+      if (!userError && userData && userData.semester) {
+        const currentUserSemester = userData.semester;
+        
+        // If semester doesn't match, return empty array
+        if (currentUserSemester !== sectionSemester) {
+          return [];
+        }
+      }
     }
 
     const { data, error } = await supabase
@@ -2089,6 +2265,39 @@ export async function getUserPresentationGroup(userId: string, sectionId: number
       return null;
     }
 
+    // Get user's semester first
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('semester')
+      .eq('clerk_id', userId)
+      .single();
+
+    if (userError) {
+      console.error('Error getting user data:', userError);
+      return null;
+    }
+
+    const userSemester = userData?.semester || null;
+
+    // Get the section's semester
+    const { data: sectionData, error: sectionError } = await supabase
+      .from('presentation_sections')
+      .select('semester')
+      .eq('id', sectionId)
+      .single();
+
+    if (sectionError) {
+      console.error('Error getting section data:', sectionError);
+      return null;
+    }
+
+    const sectionSemester = sectionData?.semester || null;
+
+    // If user and section have different semesters, don't show any group
+    if (userSemester !== sectionSemester) {
+      return null;
+    }
+
     // First check if user exists in any presentation_group_members
     const { data: membership, error: membershipError } = await supabase
       .from('presentation_group_members')
@@ -2106,10 +2315,8 @@ export async function getUserPresentationGroup(userId: string, sectionId: number
     }
 
     // Now check if any of these groups are in the specified section
-    const groupIds = membership.map(m => m.group_id);
+    const groupIds = membership.map((m: { group_id: number }) => m.group_id);
     
-    // This query was causing the issue - it used .single() which returns an error
-    // when multiple groups are found, or when no groups are found
     const { data: groupsInSection, error: groupError } = await supabase
       .from('presentation_groups')
       .select('id')
@@ -2144,6 +2351,7 @@ export async function updatePresentationSection(
     description?: string | null;
     max_members?: number;
     active?: boolean;
+    semester?: number | null;
   }
 ): Promise<boolean> {
   try {
@@ -2743,6 +2951,36 @@ export async function updatePresentationGroupMembers(
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     console.error('Error in updatePresentationGroupMembers:', errorMessage);
+    return false;
+  }
+}
+
+/**
+ * Updates a user's semester in the database
+ * @param clerkId The Clerk ID of the user
+ * @param semester The semester to set
+ * @returns True if successful, false otherwise
+ */
+export async function updateSemester(clerkId: string, semester: number): Promise<boolean> {
+  if (!supabase) return false;
+  
+  try {
+    const { error } = await supabase
+      .from('users')
+      .update({ 
+        semester,
+        semester_selected: true // Add a flag indicating user explicitly selected a semester
+      })
+      .eq('clerk_id', clerkId);
+    
+    if (error) {
+      console.error('Error updating semester:', error);
+      return false;
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('Exception updating semester:', error);
     return false;
   }
 }

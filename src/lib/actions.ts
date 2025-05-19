@@ -195,6 +195,7 @@ export async function deleteAnnouncementAction(id: string): Promise<boolean> {
  * @param instructorTitle Title/position of the instructor
  * @param instructorEmail Email of the instructor
  * @param instructorImage URL to the instructor's profile image
+ * @param semester The semester for which the course is created
  * @returns A promise that resolves to the course ID if successful, null otherwise
  */
 export async function createCourseAction(
@@ -206,7 +207,8 @@ export async function createCourseAction(
   instructorName: string | null = null,
   instructorTitle: string | null = null,
   instructorEmail: string | null = null,
-  instructorImage: string | null = null
+  instructorImage: string | null = null,
+  semester: number = 1
 ): Promise<string | null> {
   try {
     const result = await createCourse(
@@ -218,7 +220,8 @@ export async function createCourseAction(
       instructorName,
       instructorTitle,
       instructorEmail,
-      instructorImage
+      instructorImage,
+      semester
     );
     
     if (!result) {
@@ -613,16 +616,18 @@ export async function deleteCourseFileAction(id: string): Promise<boolean> {
  * @param title The section title
  * @param maxMembers The maximum number of members in the section
  * @param description Optional section description
+ * @param semester Optional semester number
  * @returns A promise that resolves to the section ID if successful, or null if failed
  */
 export async function createPresentationSectionAction(
   adminId: string,
   title: string,
   maxMembers: number,
-  description: string | null = null
+  description: string | null = null,
+  semester: number | null = null
 ): Promise<number | null> {
   try {
-    return await createPresentationSection(adminId, title, maxMembers, description);
+    return await createPresentationSection(adminId, title, maxMembers, description, semester);
   } catch (error) {
     console.error('Error in createPresentationSectionAction:', error);
     throw new Error('Failed to create presentation section');
@@ -632,13 +637,28 @@ export async function createPresentationSectionAction(
 /**
  * Function to get all presentation sections
  * @param activeOnly Whether to fetch only active sections
+ * @param semester Optional semester number to filter sections
  * @returns A promise that resolves to an array of presentation sections
  */
 export async function getPresentationSectionsAction(
-  activeOnly: boolean = true
+  activeOnly: boolean = true,
+  semester: number | null = null
 ): Promise<PresentationSection[]> {
   try {
-    return await getPresentationSections(activeOnly);
+    // Filter sections by semester when provided
+    const sections = await getPresentationSections(activeOnly, semester);
+    
+    // Double check that we're filtering correctly
+    if (semester !== null) {
+      const mismatchSections = sections.filter(s => s.semester !== semester);
+      if (mismatchSections.length > 0) {
+        // Filter out sections with wrong semester (in case server filtering failed)
+        const filteredSections = sections.filter(s => s.semester === semester);
+        return filteredSections;
+      }
+    }
+    
+    return sections;
   } catch (error) {
     console.error('Error in getPresentationSectionsAction:', error);
     throw new Error('Failed to fetch presentation sections');
@@ -745,6 +765,7 @@ export async function updatePresentationSectionAction(
     description?: string | null;
     max_members?: number;
     active?: boolean;
+    semester?: number | null;
   }
 ): Promise<boolean> {
   try {

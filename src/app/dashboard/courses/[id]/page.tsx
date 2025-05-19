@@ -64,9 +64,38 @@ export default function CoursePage({ params }: CoursePageProps) {
 
   // SWR fetcher functions for real-time updates
   const fetcher = async (url: string) => {
-    const res = await fetch(url);
-    if (!res.ok) throw new Error('Failed to fetch data');
-    return res.json();
+    try {
+      const res = await fetch(url, {
+        method: 'GET',
+        credentials: 'include', // Include cookies for authentication
+        headers: {
+          'Content-Type': 'application/json',
+          // Add any additional auth headers if available
+          ...(user?.id ? { 'X-User-ID': user.id } : {}),
+        },
+        // Make sure we don't use cached responses
+        cache: 'no-store',
+        next: { revalidate: 0 }
+      });
+      
+      if (!res.ok) {
+        if (res.status === 401) {
+          console.error('Authentication error: You are not authorized to access this resource');
+          // Redirect to login page or display a message
+          if (typeof window !== 'undefined') {
+            // Force refresh auth session on 401
+            setTimeout(() => {
+              router.push('/sign-in');
+            }, 1000);
+          }
+        }
+        throw new Error(`Failed to fetch data: ${res.status}`);
+      }
+      return res.json();
+    } catch (error) {
+      console.error('Fetch error:', error);
+      throw error;
+    }
   };
 
   // Use SWR for real-time data updates
@@ -140,6 +169,20 @@ export default function CoursePage({ params }: CoursePageProps) {
     // We no longer automatically set the first section as active
     // This allows all sections to be closed initially
   }, [courseId]);
+  
+  // Check if student's semester matches this course's semester
+  useEffect(() => {
+    if (course && user) {
+      const userSemester = user.publicMetadata?.semester as number | undefined;
+      const courseSemester = course.semester;
+      
+      // If course semester is defined and doesn't match user's semester, redirect back to courses
+      if (courseSemester !== null && userSemester !== undefined && courseSemester !== userSemester) {
+        console.warn(`Course semester (${courseSemester}) doesn't match user semester (${userSemester})`);
+        router.push('/dashboard/courses');
+      }
+    }
+  }, [course, user, router]);
   
   // Toggle saving/bookmarking the course
   const toggleSave = () => {

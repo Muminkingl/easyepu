@@ -32,7 +32,7 @@ import { getAnnouncements, getAllUsers } from "@/lib/supabase";
 
 export default function AdminDashboard() {
   const { user, isLoaded, isSignedIn } = useUser();
-  const { isAdmin, isLoading: isRoleLoading, error: roleError, debugInfo, refreshRole } = useUserRole();
+  const { isAdmin, isOwner, isLoading: isRoleLoading, error: roleError, debugInfo, refreshRole } = useUserRole();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [envError, setEnvError] = useState(false);

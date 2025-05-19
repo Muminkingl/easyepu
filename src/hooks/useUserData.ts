@@ -1,6 +1,6 @@
 import { useUser } from '@clerk/nextjs';
 import { useState, useEffect } from 'react';
-import { getUserData, upsertUser, updateUsername as updateUsernameInDB, updatePhoneNumber, updateGender, updateGroupClass, UserData, UserRole } from '@/lib/supabase';
+import { getUserData, upsertUser, updateUsername as updateUsernameInDB, updatePhoneNumber, updateGender, updateGroupClass, updateSemester, UserData, UserRole } from '@/lib/supabase';
 
 export function useUserData() {
   const { user, isLoaded, isSignedIn } = useUser();
@@ -180,6 +180,21 @@ export function useUserData() {
     }
   };
 
+  const updateUserSemester = async (semester: number): Promise<boolean> => {
+    if (!userData || !user) return false;
+    
+    try {
+      const success = await updateSemester(user.id, semester);
+      if (success) {
+        setUserData(prev => prev ? { ...prev, semester } : null);
+      }
+      return success;
+    } catch (err) {
+      console.error('Error updating semester:', err);
+      return false;
+    }
+  };
+
   const isAdmin = userData?.role === 'admin';
 
   return { 
@@ -190,6 +205,7 @@ export function useUserData() {
     updateUsername,
     updateUserPhoneNumber,
     updateUserGender,
-    updateUserGroup
+    updateUserGroup,
+    updateUserSemester
   };
 }

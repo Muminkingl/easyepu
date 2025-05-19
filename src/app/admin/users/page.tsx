@@ -19,9 +19,10 @@ import {
   X,
   ArrowUp,
   ArrowDown,
-  ChevronDown
+  ChevronDown,
+  GraduationCap
 } from 'lucide-react';
-import { getAllUsers, UserData } from '@/lib/supabase';
+import { getAllUsers, getUserData, UserData } from '@/lib/supabase';
 import { useUserRole } from '@/hooks/useUserRole';
 import * as XLSX from 'xlsx';
 import { useUser } from '@clerk/nextjs';
@@ -50,8 +51,16 @@ function getInitialLetter(user: UserData): string {
 }
 
 // Create a fetcher function for SWR
-const usersFetcher = async () => {
-  const data = await getAllUsers();
+const usersFetcher = async (key: string, adminId: string | undefined) => {
+  // Get admin's semester if available
+  if (!adminId) return [];
+  
+  const userData = await getUserData(adminId);
+  const adminSemester = userData?.semester || null;
+  const userRole = userData?.role || 'student';
+  
+  // Get users filtered by admin's semester (unless user is owner, then get all)
+  const data = await getAllUsers(adminSemester, userRole);
   return data;
 };
 
@@ -79,16 +88,45 @@ export default function ManageUsersPage() {
   const [isManualLoading, setIsManualLoading] = useState(false);
   const { user: currentUser, isLoaded: isUserLoaded } = useUser();
   const [clerkUsers, setClerkUsers] = useState<Record<string, ClerkUserData>>({});
+  const [adminSemester, setAdminSemester] = useState<number | null>(null);
+  const [isOwner, setIsOwner] = useState(false);
   
   // Use SWR for data fetching with auto-refresh
-  const { data, error, mutate } = useSWR('users', usersFetcher, {
-    refreshInterval: 60000, // Auto-refresh every minute
-    revalidateOnFocus: true,
-    revalidateOnReconnect: true,
-  });
+  const { data, error, mutate } = useSWR(
+    currentUser ? ['users', currentUser.id] : null, 
+    ([key, adminId]) => usersFetcher(key, adminId),
+    {
+      refreshInterval: 60000, // Auto-refresh every minute
+      revalidateOnFocus: true,
+      revalidateOnReconnect: true,
+    }
+  );
   
   const users = data || [];
   const loading = isManualLoading || (!data && !error);
+
+  // Get admin's semester for display
+  useEffect(() => {
+    const fetchAdminSemester = async () => {
+      if (currentUser) {
+        try {
+          const userData = await getUserData(currentUser.id);
+          if (userData && userData.semester !== undefined && userData.semester !== null) {
+            setAdminSemester(userData.semester);
+          }
+          // Store the user role
+          if (userData?.role === 'owner') {
+            setRoleFilter('all'); // Default to showing all users for owners
+            setIsOwner(true);
+          }
+        } catch (error) {
+          console.error('Error fetching admin semester:', error);
+        }
+      }
+    };
+    
+    fetchAdminSemester();
+  }, [currentUser]);
 
   // Function to export users to Excel
   const downloadExcel = () => {
@@ -242,6 +280,15 @@ export default function ManageUsersPage() {
     setClerkUsers({});
     fetchClerkData();
     
+    // Refetch admin's semester
+    if (currentUser) {
+      getUserData(currentUser.id).then(userData => {
+        if (userData && userData.semester !== undefined && userData.semester !== null) {
+          setAdminSemester(userData.semester);
+        }
+      });
+    }
+    
     mutate()
       .then(() => {
         setTimeout(() => {
@@ -328,6 +375,23 @@ export default function ManageUsersPage() {
               </Link>
               <span className="mx-2 text-indigo-700">|</span>
               <h1 className="text-lg font-bold text-indigo-100">Manage Users</h1>
+              {isOwner ? (
+                <div className="ml-4 flex items-center">
+                  <span className="px-3 py-1 bg-purple-800/50 text-purple-300 text-sm rounded-full flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 mr-1">
+                      <path fillRule="evenodd" d="M12 1.5a5.25 5.25 0 00-5.25 5.25v3a3 3 0 00-3 3v6.75a3 3 0 003 3h10.5a3 3 0 003-3v-6.75a3 3 0 00-3-3v-3c0-2.9-2.35-5.25-5.25-5.25zm3.75 8.25v-3a3.75 3.75 0 10-7.5 0v3h7.5z" clipRule="evenodd" />
+                    </svg>
+                    Owner Access: All Users
+                  </span>
+                </div>
+              ) : adminSemester !== null && (
+                <div className="ml-4 flex items-center">
+                  <span className="px-3 py-1 bg-indigo-800/50 text-indigo-300 text-sm rounded-full flex items-center">
+                    <GraduationCap className="h-4 w-4 mr-1 text-indigo-400" />
+                    Semester {adminSemester} Students
+                  </span>
+                </div>
+              )}
             </div>
             
             <div className="flex flex-wrap items-center gap-3 sm:space-x-3">
@@ -526,11 +590,19 @@ export default function ManageUsersPage() {
             </div>
             <h2 className="text-xl font-semibold text-indigo-100 mb-2">No Users Found</h2>
             <p className="text-indigo-300 mb-6">
-              {searchTerm || roleFilter !== 'all' 
-                ? 'No users match your search criteria. Try adjusting your filters.'
-                : 'There are no users in the system yet.'}
+              {adminSemester === null 
+                ? 'No semester selected. Please select a semester in your profile.'
+                : searchTerm || roleFilter !== 'all' 
+                  ? 'No users match your search criteria. Try adjusting your filters.'
+                  : 'There are no users in the system yet.'}
             </p>
-            {(searchTerm || roleFilter !== 'all') && (
+            {adminSemester === null ? (
+              <Link href="/dashboard/profile" 
+                className="inline-flex items-center justify-center px-5 py-2 bg-indigo-700/80 hover:bg-indigo-600/80 text-white font-medium rounded-lg transition-all duration-200 border border-indigo-600/50">
+                <GraduationCap className="h-4 w-4 mr-2" />
+                Set Semester in Profile
+              </Link>
+            ) : (searchTerm || roleFilter !== 'all') && (
                 <button
                   onClick={() => {
                     setSearchTerm('');

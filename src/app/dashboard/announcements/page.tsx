@@ -4,13 +4,19 @@ import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import useSWR from 'swr';
 import { getAnnouncements, Announcement, getPollByAnnouncementId } from '@/lib/supabase';
+import { useUserData } from '@/hooks/useUserData';
 import { Bell, AlertTriangle, Calendar, Users, Search, Loader2, FileText, BarChart, RefreshCw, X } from 'lucide-react';
 import { useTranslations } from '@/lib/i18n';
+import { useSemesterCheck } from '@/hooks/useSemesterCheck';
+import Maintenance from '@/components/Maintenance';
 
 // Fetcher function for SWR
-const announcementsFetcher = async () => {
+const announcementsFetcher = async (key: string, semester?: number) => {
   const data = await getAnnouncements();
-  const announcements = data.filter(a => a.published);
+  // Filter announcements that are published and either match the semester or have no semester set
+  const announcements = data
+    .filter(a => a.published)
+    .filter(a => !semester || !a.semester || a.semester === semester);
   
   // Check each announcement for polls
   const announcementsWithPollInfo = await Promise.all(
@@ -28,13 +34,19 @@ const announcementsFetcher = async () => {
 };
 
 export default function AnnouncementsPage() {
+  const { userData } = useUserData();
   const { t, lang: locale, dir } = useTranslations();
+  const { semesterSelected, isChecking, SemesterLock } = useSemesterCheck();
   const isRtl = dir === 'rtl';
-  const { data, error, mutate } = useSWR('announcements', announcementsFetcher, {
-    refreshInterval: 60000, // Auto-refresh every minute
-    revalidateOnFocus: true,
-    revalidateOnReconnect: true,
-  });
+  const { data, error, mutate } = useSWR(
+    ['announcements', userData?.semester], 
+    ([key, semester]) => announcementsFetcher(key, semester),
+    {
+      refreshInterval: 60000, // Auto-refresh every minute
+      revalidateOnFocus: true,
+      revalidateOnReconnect: true,
+    }
+  );
   
   const [readAnnouncements, setReadAnnouncements] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -99,6 +111,32 @@ export default function AnnouncementsPage() {
     mutate();
   };
 
+  // Maintenance mode
+  const maintenanceMode = true; // Set this to false to disable maintenance mode
+  
+  // If in maintenance mode, show maintenance screen
+  if (maintenanceMode) {
+    return <Maintenance returnUrl="/dashboard" returnText={t('sidebar.dashboard')} />;
+  }
+  
+  // Show loading state if still checking semester requirements
+  if (isChecking) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin h-12 w-12 border-4 border-indigo-500 rounded-full border-t-transparent"></div>
+      </div>
+    );
+  }
+  
+  // If semester is not selected, show the lock screen
+  if (!semesterSelected) {
+    return (
+      <div className="min-h-screen p-6">
+        <SemesterLock />
+      </div>
+    );
+  }
+  
   return (
     <div className="min-h-screen py-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-6xl mx-auto">

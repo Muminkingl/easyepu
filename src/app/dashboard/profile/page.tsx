@@ -8,6 +8,7 @@ import { checkEnvironmentVariables } from "@/lib/debugUtils";
 import PhoneNumberForm from "@/components/PhoneNumberForm";
 import GenderForm from "@/components/GenderForm";
 import GroupForm from "@/components/GroupForm";
+import SemesterForm from "@/components/SemesterForm";
 import { getUserData } from '@/lib/supabase';
 import { useTranslations } from '@/lib/i18n';
 import { 
@@ -569,6 +570,26 @@ export default function ProfilePage() {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* Semester Information */}
+        <div className="max-w-6xl mx-auto mb-6 overflow-hidden bg-indigo-900/30 backdrop-blur-sm rounded-2xl shadow-xl border border-indigo-800/30 divide-y divide-indigo-800/30">
+          <div className="px-6 py-5">
+            <h3 className="text-lg font-medium leading-6 text-white">
+              {renderIconWithText(GraduationCap, t('profile.semesterInfo.heading') || 'Semester Information')}
+            </h3>
+            <p className="mt-1 text-sm text-indigo-300">
+              {t('profile.semesterInfo.headingDescription') || 'Select your current semester to see relevant content'}
+            </p>
+          </div>
+          <div className="px-6 py-5">
+            <SemesterForm 
+              userId={user.id} 
+              initialSemester={localUserData?.semester || undefined} 
+              onUpdate={refreshUserData}
+              required={!localUserData?.semester}
+            />
           </div>
         </div>
       </div>

@@ -93,7 +93,9 @@
   },
   "common": {
     "loading": "Loading...",
-    "backToHome": "Back to Home"
+    "backToHome": "Back to Home",
+    "save": "Save",
+    "saving": "Saving..."
   },
   "dashboard": {
     "loading": "Loading your dashboard...",
@@ -260,6 +262,22 @@
     "usernameInfo": {
       "title": "Username Settings",
       "description": "Set your username (can only be set once)"
+    },
+    "semester": "Semester",
+    "semesterOption": "Semester {num}",
+    "selectSemester": "Select a semester",
+    "semesterInfo": {
+      "title": "Semester Selection",
+      "heading": "Semester Information",
+      "headingDescription": "Select your current semester to see relevant content",
+      "description": "Please select your current semester to see content specific to your academic progress",
+      "updateFailed": "Failed to update semester on the server",
+      "updateLocalFailed": "Semester updated on server but failed to update locally",
+      "requiredMessage": "You must select your semester before accessing this feature",
+      "locked": "Feature Locked",
+      "lockedMessage": "This feature is locked until you select your semester",
+      "selectSemesterFirst": "Please select a semester first",
+      "selectSemesterPlaceholder": "Select semester..."
     }
   },
   "cookiePolicy": {
@@ -451,6 +469,13 @@
     "noPresentation": "No presentation uploaded yet",
     "fileDownloadNotAllowed": "Downloads disabled for students. Contact admin if needed."
   },
+  "admin": {
+    "presentationGroups": {
+      "currentSemester": "You are currently in semester {semester}",
+      "semesterFilter": "Groups are filtered to only show those for your selected semester. Create new groups in this semester to make them available to matching students.",
+      "semesterHelp": "Select the semester this presentation section should be available for. Students will only see sections matching their selected semester."
+    }
+  },
   "username": {
     "title": "Username",
     "setUsername": "Set Your Username",
@@ -471,5 +496,11 @@
       "failed": "Failed to update username. Please try again."
     },
     "success": "Username updated successfully!"
+  },
+  "maintenance": {
+    "title": "Under Construction",
+    "subtitle": "This section is under construction",
+    "message": "We're currently working on improving this section. Please check back later.",
+    "returnButton": "Return to Dashboard"
   }
 } 

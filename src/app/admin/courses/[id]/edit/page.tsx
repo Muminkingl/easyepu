@@ -13,7 +13,8 @@ import {
   deleteCourseSectionAction,
   deleteCourseFileAction
 } from '@/lib/actions';
-import { getCourseById, Course, CourseSection, CourseFile } from '@/lib/supabase';
+import { getCourseById, Course, CourseSection, CourseFile, getUserData } from '@/lib/supabase';
+import { useUser } from '@clerk/nextjs';
 import { 
   ChevronLeft, 
   AlertTriangle, 
@@ -60,7 +61,8 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
   const courseId = resolvedParams.id;
 
   const router = useRouter();
-  const { isAdmin, isLoading: isRoleLoading } = useUserRole();
+  const { user } = useUser();
+  const { isAdmin, isOwner, isLoading: isRoleLoading } = useUserRole();
   const [formValues, setFormValues] = useState({
     title: '',
     description: '',
@@ -70,8 +72,10 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
     instructorName: '',
     instructorTitle: '',
     instructorEmail: '',
-    instructorImage: ''
+    instructorImage: '',
+    semester: 1
   });
+  const [adminSemester, setAdminSemester] = useState<number | null>(null);
   const [course, setCourse] = useState<Course | null>(null);
   const [sections, setSections] = useState<CourseSection[]>([]);
   const [files, setFiles] = useState<CourseFile[]>([]);
@@ -95,13 +99,43 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [notAuthorized, setNotAuthorized] = useState(false);
 
+  // First, load the admin's semester
+  useEffect(() => {
+    async function loadUserSemester() {
+      if (!user || !isAdmin) return;
+      
+      try {
+        const userData = await getUserData(user.id);
+        setAdminSemester(userData?.semester || null);
+      } catch (err) {
+        console.error('Error loading admin semester:', err);
+        setError('Failed to load your semester information');
+      }
+    }
+    
+    if (user && isAdmin && !isRoleLoading) {
+      loadUserSemester();
+    }
+  }, [user, isAdmin, isRoleLoading]);
+
+  // Second, load the course data
   useEffect(() => {
     async function loadCourse() {
       try {
+        if (!adminSemester && !isOwner) return; // Wait until we have admin semester (unless owner)
+        
         const data = await getCourseById(courseId);
         if (!data) {
           setError('Course not found');
+          return;
+        }
+        
+        // Check if course semester matches admin's semester (unless owner)
+        if (!isOwner && data.semester !== adminSemester) {
+          setNotAuthorized(true);
+          setError(`You can only edit courses from your selected semester (Semester ${adminSemester})`);
           return;
         }
         
@@ -115,7 +149,8 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
           instructorName: data.instructor_name || '',
           instructorTitle: data.instructor_title || '',
           instructorEmail: data.instructor_email || '',
-          instructorImage: data.instructor_image || ''
+          instructorImage: data.instructor_image || '',
+          semester: data.semester
         });
         
         // Load course sections and files
@@ -128,10 +163,10 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
       }
     }
 
-    if (!isRoleLoading && isAdmin) {
+    if ((adminSemester !== null) || isOwner) {
       loadCourse();
     }
-  }, [courseId, isRoleLoading, isAdmin]);
+  }, [courseId, adminSemester, isOwner]);
   
   const loadCourseSections = async () => {
     try {
@@ -212,7 +247,8 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
           instructor_name: formValues.instructorName || null,
           instructor_title: formValues.instructorTitle || null,
           instructor_email: formValues.instructorEmail || null,
-          instructor_image: formValues.instructorImage || null
+          instructor_image: formValues.instructorImage || null,
+          semester: formValues.semester
         }
       );
 
@@ -481,7 +517,7 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
     );
   }
 
-  if (error && !course) {
+  if (error && (!course || notAuthorized)) {
     return (
       <div className="min-h-screen bg-indigo-950 flex items-center justify-center p-4">
         <div className="bg-indigo-900/40 backdrop-blur-sm rounded-2xl shadow-xl p-8 max-w-md w-full border border-indigo-800/30">
@@ -489,7 +525,7 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
             <div className="w-20 h-20 bg-red-900/30 rounded-full flex items-center justify-center mb-6 border border-red-800/30">
               <AlertTriangle className="h-10 w-10 text-red-400" suppressHydrationWarning={true} />
             </div>
-            <h2 className="text-2xl font-bold text-indigo-100 mb-2">Error</h2>
+            <h2 className="text-2xl font-bold text-indigo-100 mb-2">Access Restricted</h2>
             <p className="text-indigo-300 text-center mb-6">{error}</p>
             <Link 
               href="/admin/courses" 
@@ -497,6 +533,28 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
             >
               <ChevronLeft className="h-5 w-5 mr-2" />
               Back to Courses
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  
+  if (adminSemester === null) {
+    return (
+      <div className="min-h-screen bg-indigo-950 flex items-center justify-center p-4">
+        <div className="bg-indigo-900/40 backdrop-blur-sm rounded-2xl shadow-xl p-8 max-w-md w-full border border-indigo-800/30">
+          <div className="flex flex-col items-center">
+            <div className="w-20 h-20 bg-amber-900/30 rounded-full flex items-center justify-center mb-6 border border-amber-800/30">
+              <AlertTriangle className="h-10 w-10 text-amber-400" suppressHydrationWarning={true} />
+            </div>
+            <h2 className="text-2xl font-bold text-indigo-100 mb-2">No Semester Selected</h2>
+            <p className="text-indigo-300 text-center mb-6">You need to select a semester in your profile before you can manage courses.</p>
+            <Link 
+              href="/dashboard/profile" 
+              className="inline-flex items-center justify-center px-5 py-3 bg-indigo-700/80 hover:bg-indigo-600/80 text-white font-medium rounded-xl transition-all duration-200 transform hover:scale-105 border border-indigo-600/50"
+            >
+              Go to Profile
             </Link>
           </div>
         </div>
@@ -616,6 +674,41 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                   </option>
                 ))}
               </select>
+            </div>
+            
+            <div>
+              <label htmlFor="semester" className="block text-sm font-medium text-indigo-300 mb-1">
+                Semester
+              </label>
+              {isOwner ? (
+                <>
+                  <select
+                    id="semester"
+                    name="semester"
+                    value={formValues.semester}
+                    onChange={handleChange}
+                    className="w-full px-3 py-2 bg-indigo-800/30 border border-indigo-700/50 rounded-md text-indigo-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    {[1, 2, 3, 4, 5, 6, 7, 8].map(semester => (
+                      <option key={semester} value={semester}>
+                        Semester {semester}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-sm text-purple-400">
+                    As an owner, you can change which semester this course belongs to
+                  </p>
+                </>
+              ) : (
+                <>
+                  <div className="w-full px-3 py-2 bg-indigo-800/30 border border-indigo-700/50 rounded-md text-indigo-100">
+                    Semester {formValues.semester}
+                  </div>
+                  <p className="mt-1 text-sm text-indigo-400">
+                    You can only edit courses from your selected semester
+                  </p>
+                </>
+              )}
             </div>
 
             <div className="flex items-center">

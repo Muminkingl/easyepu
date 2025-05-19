@@ -45,6 +45,7 @@ import { supabase } from '@/lib/supabase';
 import { updateGroupMembers, forcePageRefresh, forceHardRefresh } from '@/lib/memberUpdates';
 import GroupMembersList from '@/components/GroupMembersList';
 import MemberEditor from '@/components/MemberEditor';
+import { useSemesterCheck } from '@/hooks/useSemesterCheck';
 
 type Group = {
   id: string | number;
@@ -59,6 +60,7 @@ export default function PresentationGroupPage() {
   const { isLoaded, isSignedIn, user } = useUser();
   const { userData, isLoading: userDataLoading } = useUserData();
   const { t } = useTranslations();
+  const { semesterSelected, isChecking, SemesterLock } = useSemesterCheck();
   
   // All useState hooks
   const [mounted, setMounted] = useState(false);
@@ -275,8 +277,23 @@ export default function PresentationGroupPage() {
   const loadSections = async () => {
     try {
       setRefreshing(true);
-      const data = await getPresentationSectionsAction(true);
-      setSections(data);
+      
+      // Make sure we have a valid semester
+      if (!userData?.semester) {
+        console.error('No semester selected for user. Cannot load presentation sections.');
+        setErrorMessage('Please select a semester in your profile first.');
+        setLoading(false);
+        setRefreshing(false);
+        return;
+      }
+      
+      // Always filter sections by student's selected semester
+      const data = await getPresentationSectionsAction(true, userData.semester);
+      
+      // Double-check that we're only showing sections matching user's semester
+      const filteredData = data.filter(section => section.semester === userData.semester);
+      
+      setSections(filteredData);
       
       // Load user's groups for each section
       if (user?.id) {
@@ -286,7 +303,7 @@ export default function PresentationGroupPage() {
         // Clear any old state first
         setMyGroups(new Map());
         
-        for (const section of data) {
+        for (const section of filteredData) {
           try {
             const groupId = await getUserPresentationGroupAction(user.id, section.id);
             
@@ -296,9 +313,6 @@ export default function PresentationGroupPage() {
               
               // Load presentation file for this group
               loadPresentationFile(groupId);
-              
-              // Don't directly call loadGroupMembers - the useEffect will handle this
-              // loadGroupMembers(groupId);
             }
           } catch (error) {
             console.error(`Error loading user group for section ${section.id}:`, error);
@@ -309,12 +323,12 @@ export default function PresentationGroupPage() {
         
         // If we didn't find any groups through the normal method, try the fallback
         // This happens sometimes due to RLS issues
-        if (!foundGroups && data.length > 0) {
+        if (!foundGroups && filteredData.length > 0) {
           try {
             const fallbackGroups = new Map<number, number>();
             
             // Load all groups for the first section and check if the user is a member of any
-            const firstSection = data[0];
+            const firstSection = filteredData[0];
             const allGroups = await getPresentationGroupsBySectionAction(firstSection.id);
             
             for (const group of allGroups) {
@@ -348,7 +362,7 @@ export default function PresentationGroupPage() {
 
         // Load groups for each section
         const groupsMap = new Map<number, PresentationGroup[]>();
-        for (const section of data) {
+        for (const section of filteredData) {
           try {
             const sectionGroups = await getPresentationGroupsBySectionAction(section.id);
             groupsMap.set(section.id, sectionGroups);
@@ -370,6 +384,13 @@ export default function PresentationGroupPage() {
   };
 
   const handleSectionSelect = (section: PresentationSection) => {
+    // Check if section semester matches user's semester
+    if (section.semester !== userData?.semester) {
+      console.error(`Semester mismatch: Section semester ${section.semester} doesn't match user semester ${userData?.semester}`);
+      setErrorMessage(`You can only select presentation groups from your current semester (${userData?.semester}).`);
+      return;
+    }
+    
     setSelectedSection(section);
     setShowJoinForm(false);
     setGroupName('');
@@ -418,6 +439,14 @@ export default function PresentationGroupPage() {
     setErrorMessage('');
 
     try {
+      // Check if the section's semester matches the user's semester
+      if (selectedSection.semester !== userData?.semester) {
+        console.error(`Semester mismatch: Section semester ${selectedSection.semester} doesn't match user semester ${userData?.semester}`);
+        setErrorMessage(`You can only create groups in your current semester (${userData?.semester}).`);
+        setIsSubmitting(false);
+        return;
+      }
+    
       // Force a fresh check of user's group membership
       const freshGroupId = await getUserPresentationGroupAction(user.id, selectedSection.id);
       
@@ -1151,6 +1180,24 @@ export default function PresentationGroupPage() {
     return Array.from(uniqueMembers.values());
   };
 
+  // Show loading state if still checking semester requirements
+  if (isChecking) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin h-12 w-12 border-4 border-indigo-500 rounded-full border-t-transparent"></div>
+      </div>
+    );
+  }
+  
+  // If semester is not selected, show the lock screen
+  if (!semesterSelected) {
+    return (
+      <div className="min-h-screen p-6">
+        <SemesterLock />
+      </div>
+    );
+  }
+
   if (!mounted || !isLoaded || userDataLoading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
@@ -1632,10 +1679,19 @@ export default function PresentationGroupPage() {
           transition={{ duration: 0.5 }}
           className="bg-indigo-900/40 backdrop-blur-sm rounded-xl border border-indigo-800/30 shadow-xl p-6"
         >
-          <h2 className="text-xl font-semibold text-indigo-100 mb-4 flex items-center">
+          <h2 className="text-xl font-semibold text-indigo-100 mb-1 flex items-center">
             <BarChart4 className="h-5 w-5 mr-2 text-indigo-400" />
             {t('presentationGroupPage.availableSections')}
+            {userData?.semester && (
+              <span className="ml-2 text-base font-normal text-indigo-300">
+                (Semester {userData.semester})
+              </span>
+            )}
           </h2>
+          
+          <p className="text-sm text-indigo-400 mb-4">
+            Only showing presentation sections for your currently selected semester
+          </p>
           
           {loading ? (
             <div className="flex justify-center items-center h-40">
@@ -1645,6 +1701,9 @@ export default function PresentationGroupPage() {
             <div className="text-center p-8 bg-indigo-800/30 rounded-lg border border-indigo-700/30">
               <UserGroup className="h-10 w-10 text-indigo-500 mx-auto mb-3" />
               <p className="text-indigo-200">{t('presentationGroupPage.noSectionsAvailable')}</p>
+              <p className="text-sm text-indigo-400 mt-1">
+                No presentation sections found for semester {userData?.semester}.
+              </p>
               <p className="text-sm text-indigo-400 mt-1">{t('presentationGroupPage.checkBackLater')}</p>
             </div>
           ) : (

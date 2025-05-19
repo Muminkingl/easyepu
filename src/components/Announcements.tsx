@@ -4,13 +4,17 @@ import { useState, useEffect, useCallback } from 'react';
 import useSWR from 'swr';
 import Link from 'next/link';
 import { getAnnouncements, Announcement, getPollByAnnouncementId } from '@/lib/supabase';
+import { useUserData } from '@/hooks/useUserData';
 import { Bell, AlertTriangle, ChevronRight, X, FileText, BarChart, RefreshCw } from 'lucide-react';
 import { useTranslations } from '@/lib/i18n';
 
 // Create a fetcher function for SWR
-const announcementsFetcher = async () => {
+const announcementsFetcher = async (key: string, semester?: number) => {
   const data = await getAnnouncements();
-  const announcements = data.filter(a => a.published);
+  // Filter announcements that are published and either match the semester or have no semester set
+  const announcements = data
+    .filter(a => a.published)
+    .filter(a => !semester || !a.semester || a.semester === semester);
   
   // Check each announcement for polls
   const announcementsWithPollInfo = await Promise.all(
@@ -28,13 +32,18 @@ const announcementsFetcher = async () => {
 };
 
 export default function Announcements() {
+  const { userData } = useUserData();
   const { t, dir } = useTranslations();
   // Use SWR for data fetching with auto-refresh
-  const { data, error, mutate } = useSWR('announcements', announcementsFetcher, {
-    refreshInterval: 30000, // Auto-refresh every 30 seconds
-    revalidateOnFocus: true,
-    revalidateOnReconnect: true,
-  });
+  const { data, error, mutate } = useSWR(
+    ['announcements', userData?.semester], 
+    ([key, semester]) => announcementsFetcher(key, semester), 
+    {
+      refreshInterval: 30000, // Auto-refresh every 30 seconds
+      revalidateOnFocus: true,
+      revalidateOnReconnect: true,
+    }
+  );
   
   const [dismissedAnnouncements, setDismissedAnnouncements] = useState<string[]>([]);
   const [readAnnouncements, setReadAnnouncements] = useState<string[]>([]);

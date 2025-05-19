@@ -171,6 +171,18 @@ export default function Sidebar() {
     }
   };
 
+  // Function to get the ICTE level based on semester
+  const getIcteLevel = (semester: number | null | undefined): string => {
+    if (!semester) return '';
+    
+    if (semester <= 2) return 'ICTE 1';
+    if (semester <= 4) return 'ICTE 2';
+    if (semester <= 6) return 'ICTE 3';
+    if (semester <= 8) return 'ICTE 4';
+    
+    return 'ICTE';
+  };
+
   // Render user profile section in the bottom of the sidebar
   const renderUserProfile = () => {
     // Get display name - prioritize Clerk real name, then fall back to username, then email
@@ -179,6 +191,9 @@ export default function Sidebar() {
     // Get user's profile image from Clerk or use fallback
     const profileImageUrl = user?.imageUrl || `/api/placeholder/40/40`;
     const profileInitial = user?.firstName?.charAt(0) || displayName.charAt(0) || 'U';
+    
+    // Get ICTE level based on semester
+    const icteLevel = getIcteLevel(userData?.semester);
     
     if (collapsed && !isOpen) {
       return (
@@ -216,7 +231,7 @@ export default function Sidebar() {
           {displayName && (
             <p className="text-sm font-medium text-white">{displayName}</p>
           )}
-          <p className="text-xs text-indigo-300">ICTE1</p>
+          <p className="text-xs text-indigo-300">{icteLevel}</p>
         </div>
       </div>
     );

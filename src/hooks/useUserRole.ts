@@ -5,6 +5,7 @@ import { getUserRole, getUserRoleByEmail, UserRole } from '@/lib/supabase';
 export function useUserRole() {
   const { user, isLoaded, isSignedIn } = useUser();
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
+  const [isOwner, setIsOwner] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<Error | null>(null);
   const [debugInfo, setDebugInfo] = useState<any>(null);
@@ -22,11 +23,11 @@ export function useUserRole() {
         // Try to get role by Clerk ID
         let role = await getUserRole(user.id);
         
-        // If not admin, try by email as fallback (in case the clerk_id doesn't match)
-        if (role !== 'admin' && email) {
+        // If not admin or owner, try by email as fallback (in case the clerk_id doesn't match)
+        if (role !== 'admin' && role !== 'owner' && email) {
           const emailRole = await getUserRoleByEmail(email);
-          if (emailRole === 'admin') {
-            role = 'admin';
+          if (emailRole === 'admin' || emailRole === 'owner') {
+            role = emailRole;
           }
         }
         
@@ -42,7 +43,8 @@ export function useUserRole() {
         
         setDebugInfo(debug);
         
-        setIsAdmin(role === 'admin');
+        setIsAdmin(role === 'admin' || role === 'owner');
+        setIsOwner(role === 'owner');
       } catch (err) {
         console.error('Error in useUserRole:', err);
         setError(err instanceof Error ? err : new Error('Unknown error in useUserRole'));
@@ -70,15 +72,16 @@ export function useUserRole() {
       // Try to get role by Clerk ID
       let role = await getUserRole(user.id);
       
-      // If not admin, try by email as fallback
-      if (role !== 'admin' && email) {
+      // If not admin or owner, try by email as fallback
+      if (role !== 'admin' && role !== 'owner' && email) {
         const emailRole = await getUserRoleByEmail(email);
-        if (emailRole === 'admin') {
-          role = 'admin';
+        if (emailRole === 'admin' || emailRole === 'owner') {
+          role = emailRole;
         }
       }
       
-      setIsAdmin(role === 'admin');
+      setIsAdmin(role === 'admin' || role === 'owner');
+      setIsOwner(role === 'owner');
     } catch (err) {
       console.error('Error refreshing user role:', err);
       setError(err instanceof Error ? err : new Error('Unknown error refreshing role'));
@@ -87,5 +90,5 @@ export function useUserRole() {
     }
   };
 
-  return { isAdmin, isLoading, error, debugInfo, refreshRole };
+  return { isAdmin, isOwner, isLoading, error, debugInfo, refreshRole };
 } 

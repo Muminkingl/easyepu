@@ -8,6 +8,12 @@ const isPublicRoute = createRouteMatcher(["/", "/unauthorized", "/sign-in", "/si
 const isAdminRoute = createRouteMatcher(["/admin"]);
 // Define API routes that should be rate limited
 const isApiRoute = createRouteMatcher(["/api/:path*"]);
+// Define course API routes that need special handling
+const isCourseApiRoute = createRouteMatcher([
+  "/api/courses/:id", 
+  "/api/courses/:id/sections", 
+  "/api/courses/:id/files"
+]);
 
 // Simple in-memory rate limiting
 // In production, use a Redis store or similar for distributed environments
@@ -70,6 +76,25 @@ export default clerkMiddleware(async (auth, req) => {
       );
       return response;
     }
+    
+    // Handle API authentication - all API routes require auth
+    const { userId } = await auth();
+    
+    // If it's an API route and user is not authenticated, return 401
+    if (!userId) {
+      return new NextResponse(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { 
+          status: 401, 
+          headers: { 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+    
+    // Modify response to include user ID in headers for course APIs
+    if (isCourseApiRoute(req)) {
+      response.headers.set('X-User-ID', userId);
+    }
   }
 
   // Add security headers to all responses
@@ -90,8 +115,8 @@ export default clerkMiddleware(async (auth, req) => {
   // Remove restrictive permissions policy
   // response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
 
-  // For non-public routes
-  if (!isPublicRoute(req)) {
+  // For non-public routes that aren't API routes
+  if (!isPublicRoute(req) && !isApiRoute(req)) {
     const { userId, sessionClaims, redirectToSignIn } = await auth();
     
     // If not authenticated, redirect to sign-in
@@ -128,8 +153,8 @@ export default clerkMiddleware(async (auth, req) => {
           .eq('clerk_id', userId)
           .single();
         
-        // If there's an error or user is not an admin, redirect to dashboard
-        if (error || data?.role !== 'admin') {
+        // If there's an error or user is not an admin or owner, redirect to dashboard
+        if (error || (data?.role !== 'admin' && data?.role !== 'owner')) {
           const dashboardUrl = new URL('/', req.url);
           return NextResponse.redirect(dashboardUrl);
         }

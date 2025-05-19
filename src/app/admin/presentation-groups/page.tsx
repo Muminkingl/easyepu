@@ -32,14 +32,20 @@ import {
   User,
   Download,
   FileIcon,
-  Presentation
+  Presentation,
+  AlertCircle
 } from "lucide-react";
+import { useUserData } from "@/hooks/useUserData";
+import { useTranslations } from "@/lib/i18n";
 
 export default function PresentationGroupsAdminPage() {
   const { isLoaded, isSignedIn, user } = useUser();
+  const { userData, isAdmin } = useUserData();
+  const { t } = useTranslations();
   const [title, setTitle] = useState<string>("");
   const [description, setDescription] = useState<string>("");
   const [maxMembers, setMaxMembers] = useState<number>(3);
+  const [semester, setSemester] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [successMessage, setSuccessMessage] = useState<string>("");
   const [errorMessage, setErrorMessage] = useState<string>("");
@@ -59,19 +65,23 @@ export default function PresentationGroupsAdminPage() {
   const [mounted, setMounted] = useState(false);
   const [presentationFiles, setPresentationFiles] = useState<Map<number, { url: string; name: string }>>(new Map());
 
-  // Update the useEffect hook to set mounted state
+  // Update the useEffect hook to set mounted state and initialize semester
   useEffect(() => {
     setMounted(true);
     if (isLoaded && isSignedIn) {
+      if (userData?.semester) {
+        setSemester(userData.semester);
+      }
       loadSections();
     }
-  }, [isLoaded, isSignedIn]);
+  }, [isLoaded, isSignedIn, userData]);
 
   // Load presentation sections from the server
   const loadSections = async () => {
     try {
       setRefreshing(true);
-      const data = await getPresentationSectionsAction(false);
+      // Filter sections by admin's semester if selected
+      const data = await getPresentationSectionsAction(false, userData?.semester || null);
       setSections(data);
       setLoading(false);
     } catch (error) {
@@ -169,6 +179,14 @@ export default function PresentationGroupsAdminPage() {
       return;
     }
 
+    // Ensure we're using the admin's current semester
+    const currentSemester = userData?.semester || null;
+    if (!currentSemester) {
+      setErrorMessage("You must have a semester selected in your profile to create presentation sections");
+      setIsSubmitting(false);
+      return;
+    }
+
     try {
       if (!user?.id) {
         throw new Error("User not authenticated");
@@ -182,7 +200,8 @@ export default function PresentationGroupsAdminPage() {
           {
             title: title.trim(),
             description: description.trim() || null,
-            max_members: maxMembers
+            max_members: maxMembers,
+            semester: currentSemester
           }
         );
 
@@ -200,7 +219,8 @@ export default function PresentationGroupsAdminPage() {
           user.id,
           title.trim(),
           maxMembers,
-          description.trim() || null
+          description.trim() || null,
+          currentSemester
         );
 
         if (sectionId) {
@@ -229,6 +249,8 @@ export default function PresentationGroupsAdminPage() {
     setTitle(section.title);
     setDescription(section.description || "");
     setMaxMembers(section.max_members);
+    // Always use the currently selected semester from userData
+    setSemester(userData?.semester || null);
     setEditMode(true);
     setEditingSectionId(section.id);
     setSuccessMessage("");
@@ -328,6 +350,7 @@ export default function PresentationGroupsAdminPage() {
     setTitle("");
     setDescription("");
     setMaxMembers(3);
+    setSemester(userData?.semester || null);
     setSuccessMessage("");
     setErrorMessage("");
   };
@@ -590,23 +613,50 @@ export default function PresentationGroupsAdminPage() {
     downloadFile(url, filename);
   };
 
-  // Replace the conditional rendering for loading with a check for mounted state
-  // This ensures that the server and client render the same initial state
-  if (!mounted) {
-    return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
-      </div>
-    );
-  }
+  // Generate semester options (1-8)
+  const semesterOptions = Array.from({ length: 8 }, (_, i) => i + 1);
 
-  if (mounted && !isSignedIn) {
+  // The form JSX should include the semester field
+  const renderSemesterField = () => {
+    if (!userData?.semester) {
+      return (
+        <div className="mb-4 p-3 bg-yellow-900/30 border border-yellow-800/30 rounded-lg">
+          <p className="text-yellow-200 text-sm">
+            You need to select a semester in your profile before creating presentation sections.
+          </p>
+        </div>
+      );
+    }
+    
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen p-4">
-        <h1 className="text-2xl font-bold text-red-600">Access Denied</h1>
-        <p className="mt-2 text-gray-600">Please sign in as an admin to view this page.</p>
+      <div className="mb-4">
+        <label className="block text-sm font-medium text-indigo-200 mb-1">
+          Semester
+        </label>
+        <div className="w-full px-3 py-2 bg-indigo-800/30 border border-indigo-700/50 rounded-lg text-indigo-100">
+          Semester {userData.semester}
+        </div>
+        <p className="mt-1 text-sm text-indigo-400">
+          Presentation sections will be created for your currently selected semester.
+        </p>
       </div>
     );
+  };
+
+  // Render sections with semester badges
+  const renderSemesterBadge = (semesterNum: number | null) => {
+    if (semesterNum === null) return null;
+    
+    return (
+      <span className="ml-2 inline-block px-2 py-0.5 text-xs font-medium bg-indigo-900/30 text-indigo-200 rounded-full">
+        Semester {semesterNum}
+      </span>
+    );
+  };
+
+  // Don't render anything on the server
+  if (!mounted) {
+    return null;
   }
 
   return (
@@ -631,6 +681,24 @@ export default function PresentationGroupsAdminPage() {
           Refresh
         </button>
       </div>
+
+      {/* Semester info message */}
+      {userData?.semester && (
+        <div className="mb-6 p-4 bg-indigo-900/30 border border-indigo-700/30 rounded-lg flex items-start">
+          <AlertCircle className="h-5 w-5 text-indigo-400 mr-2 flex-shrink-0 mt-0.5" />
+          <div>
+            <h3 className="font-medium text-indigo-100">
+              You are currently in semester {userData.semester}
+            </h3>
+            <p className="text-sm text-indigo-300 mt-1">
+              Groups are filtered to only show those for your selected semester. Create new groups in this semester to make them available to matching students.
+            </p>
+            <p className="text-sm text-indigo-300 mt-1">
+              You can only create presentation sections for your currently selected semester.
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Create/Edit Presentation Section Form */}
@@ -673,6 +741,9 @@ export default function PresentationGroupsAdminPage() {
                 required
               />
             </div>
+
+            {/* Add semester field */}
+            {renderSemesterField()}
 
             <div className="mb-4">
               <label htmlFor="description" className="block text-sm font-medium text-indigo-200 mb-1">
@@ -771,7 +842,17 @@ export default function PresentationGroupsAdminPage() {
           transition={{ duration: 0.5, delay: 0.1 }}
           className="bg-indigo-900/40 backdrop-blur-sm rounded-xl border border-indigo-800/30 shadow-xl p-6"
         >
-          <h2 className="text-xl font-semibold text-indigo-100 mb-4">Existing Sections</h2>
+          <h2 className="text-xl font-semibold text-indigo-100 mb-1">
+            Existing Sections
+            {userData?.semester && (
+              <span className="ml-2 text-base font-normal text-indigo-300">
+                (Semester {userData.semester})
+              </span>
+            )}
+          </h2>
+          <p className="text-sm text-indigo-400 mb-4">
+            Only showing presentation sections for your currently selected semester
+          </p>
           
           {loading ? (
             <div className="flex justify-center items-center h-64">
@@ -782,6 +863,9 @@ export default function PresentationGroupsAdminPage() {
               <UserGroup className="h-12 w-12 text-indigo-500 mb-4" />
               <h3 className="text-lg font-medium text-indigo-200 mb-2">No Presentation Sections Yet</h3>
               <p className="text-indigo-300">
+                No presentation sections found for semester {userData?.semester}.
+              </p>
+              <p className="text-indigo-300 mt-2">
                 Create your first presentation section using the form on the left.
               </p>
             </div>
@@ -796,6 +880,7 @@ export default function PresentationGroupsAdminPage() {
                     <div>
                       <h3 className="text-lg font-medium text-indigo-100">
                         {section.title}
+                        {renderSemesterBadge(section.semester)}
                         {!section.active && (
                           <span className="ml-2 inline-block px-2 py-0.5 text-xs font-medium bg-yellow-900/30 text-yellow-200 rounded-full">
                             Inactive
@@ -855,13 +940,13 @@ export default function PresentationGroupsAdminPage() {
                       
                       {renderDeleteConfirmation(section)}
                       
-                          <button
+                      <button
                         onClick={() => confirmDelete(section.id)}
-                          className="p-1.5 hover:bg-red-900/30 rounded-full transition-colors ml-1"
-                          aria-label="Delete"
-                        >
-                          <TrashIcon className="h-5 w-5 text-red-400" />
-                        </button>
+                        className="p-1.5 hover:bg-red-900/30 rounded-full transition-colors ml-1"
+                        aria-label="Delete"
+                      >
+                        <TrashIcon className="h-5 w-5 text-red-400" />
+                      </button>
                     </div>
                   </div>
                 </div>

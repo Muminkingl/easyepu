@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useUserRole } from '@/hooks/useUserRole';
 import { createCourseAction } from '@/lib/actions';
+import { getUserData } from '@/lib/supabase';
 import { useUser } from '@clerk/nextjs';
 import { 
   ChevronLeft, 
@@ -49,7 +50,15 @@ export default function CreateCoursePage() {
     description: '',
     imageUrl: '',
     backgroundColor: 'bg-indigo-200',
+    semester: 1,
   });
+  
+  // Current admin's semester
+  const [adminSemester, setAdminSemester] = useState<number | null>(null);
+
+  // Available semesters (1-8)
+  const semesters = Array.from({ length: 8 }, (_, i) => i + 1);
+
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -71,6 +80,34 @@ export default function CreateCoursePage() {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  useEffect(() => {
+    // Get admin's semester when component mounts
+    async function loadUserSemester() {
+      if (!user) return;
+      
+      try {
+        const userData = await getUserData(user.id);
+        const semester = userData?.semester || null;
+        
+        if (semester !== null) {
+          setAdminSemester(semester);
+          // Set the form's semester to match admin's semester
+          setFormValues(prev => ({ ...prev, semester }));
+        } else {
+          // Redirect to profile if admin has no semester selected
+          router.push('/dashboard/profile');
+        }
+      } catch (err) {
+        console.error('Error loading user data:', err);
+        setError('Failed to get your semester information. Please try again.');
+      }
+    }
+    
+    if (user) {
+      loadUserSemester();
+    }
+  }, [user, router]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -124,7 +161,12 @@ export default function CreateCoursePage() {
         formValues.title.trim(),
         formValues.description.trim() || null,
         formValues.imageUrl.trim() || null,
-        formValues.backgroundColor
+        formValues.backgroundColor,
+        null, // instructorName
+        null, // instructorTitle
+        null, // instructorEmail
+        null, // instructorImage
+        formValues.semester // Pass the semester
       );
 
       console.log('Result from createCourseAction:', courseId);
@@ -414,6 +456,19 @@ export default function CreateCoursePage() {
                       </option>
                     ))}
                   </select>
+                </div>
+
+                <div>
+                  <label htmlFor="semester" className="block text-sm font-medium text-indigo-300 mb-1">
+                    Semester <span className="text-red-400">*</span>
+                  </label>
+                  <div className="w-full px-4 py-3 bg-indigo-800/30 border border-indigo-700/50 rounded-lg text-indigo-100">
+                    Semester {formValues.semester}
+                  </div>
+                  <p className="mt-1 text-sm text-indigo-400 flex items-center">
+                    <Info className="h-3 w-3 mr-1" />
+                    Courses can only be created for your selected semester
+                  </p>
                 </div>
 
                 <div className="pt-4 flex items-center justify-end space-x-3">
