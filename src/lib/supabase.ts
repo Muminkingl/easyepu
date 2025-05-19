@@ -1929,10 +1929,10 @@ export async function createPresentationSection(
       return null;
     }
 
-    // Check if user is admin
+    // Check if user is admin or owner
     const userRole = await getUserRole(adminId);
-    if (userRole !== 'admin') {
-      console.error('Only admins can create presentation sections');
+    if (!isAdminRole(userRole)) {
+      console.error('Only admins or owners can create presentation sections');
       return null;
     }
 
@@ -2398,10 +2398,12 @@ export async function deletePresentationSection(
       return false;
     }
 
-    // Check if user is admin
+    // Check if user is admin or owner
     const userRole = await getUserRole(adminId);
-    if (userRole !== 'admin') {
-      console.error('Only admins can delete presentation sections');
+    console.log(`User role for deletion: ${userRole}`);
+    
+    if (!isAdminRole(userRole)) {
+      console.error('Only admins or owners can delete presentation sections');
       return false;
     }
 
@@ -2419,6 +2421,7 @@ export async function deletePresentationSection(
     // If there are groups, we need to delete them first (cascading delete)
     if (groups && groups.length > 0) {
       const groupIds = groups.map(g => g.id);
+      console.log(`Deleting ${groupIds.length} groups for section ${sectionId}`);
       
       // 1. First delete all group members for these groups
       const { error: membersDeleteError } = await supabase
@@ -2444,6 +2447,7 @@ export async function deletePresentationSection(
     }
 
     // 3. Finally delete the section itself
+    console.log(`Deleting section ${sectionId}`);
     const { error } = await supabase
       .from('presentation_sections')
       .delete()
@@ -2454,6 +2458,7 @@ export async function deletePresentationSection(
       return false;
     }
 
+    console.log(`Successfully deleted section ${sectionId}`);
     return true;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);

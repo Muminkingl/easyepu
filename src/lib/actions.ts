@@ -636,8 +636,8 @@ export async function createPresentationSectionAction(
 
 /**
  * Function to get all presentation sections
- * @param activeOnly Whether to fetch only active sections
- * @param semester Optional semester number to filter sections
+ * @param activeOnly Whether to only get active sections
+ * @param semester Optional semester filter
  * @returns A promise that resolves to an array of presentation sections
  */
 export async function getPresentationSectionsAction(
@@ -645,10 +645,16 @@ export async function getPresentationSectionsAction(
   semester: number | null = null
 ): Promise<PresentationSection[]> {
   try {
+    // Get the user role from context, using admin check function
+    let userRole = 'student';
+    
+    // We can't get the user role here since we don't have the user ID
+    // Instead, rely on the caller to pass the correct role if needed
+    
     // Filter sections by semester when provided
     const sections = await getPresentationSections(activeOnly, semester);
     
-    // Double check that we're filtering correctly
+    // Double check that we're filtering correctly when we have a semester filter
     if (semester !== null) {
       const mismatchSections = sections.filter(s => s.semester !== semester);
       if (mismatchSections.length > 0) {

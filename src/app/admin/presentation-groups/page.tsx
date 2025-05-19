@@ -64,6 +64,9 @@ export default function PresentationGroupsAdminPage() {
   const [sectionDownloading, setSectionDownloading] = useState<number | null>(null);
   const [mounted, setMounted] = useState(false);
   const [presentationFiles, setPresentationFiles] = useState<Map<number, { url: string; name: string }>>(new Map());
+  
+  // Check if user has owner role for advanced admin privileges
+  const isOwner = userData?.role === 'owner';
 
   // Update the useEffect hook to set mounted state and initialize semester
   useEffect(() => {
@@ -80,8 +83,12 @@ export default function PresentationGroupsAdminPage() {
   const loadSections = async () => {
     try {
       setRefreshing(true);
-      // Filter sections by admin's semester if selected
-      const data = await getPresentationSectionsAction(false, userData?.semester || null);
+      
+      // For owner role, don't filter by semester (pass null)
+      // For regular admins, filter by their selected semester
+      const semesterFilter = isOwner ? null : (userData?.semester || null);
+      
+      const data = await getPresentationSectionsAction(false, semesterFilter);
       setSections(data);
       setLoading(false);
     } catch (error) {
@@ -653,6 +660,13 @@ export default function PresentationGroupsAdminPage() {
       </span>
     );
   };
+
+  // Add console log to help with debugging
+  useEffect(() => {
+    if (userData) {
+      console.log('User role in presentation groups admin:', userData.role);
+    }
+  }, [userData]);
 
   // Don't render anything on the server
   if (!mounted) {
