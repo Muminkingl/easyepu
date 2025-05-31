@@ -901,7 +901,7 @@ export async function createCourse(
       return null;
     }
 
-    if (userData?.role !== 'admin') {
+    if (userData?.role !== 'admin' && userData?.role !== 'owner') {
       console.error('User is not an admin. Role:', userData?.role);
       return null;
     }
@@ -938,12 +938,34 @@ export async function createCourse(
           p_instructor_name: instructorName,
           p_instructor_title: instructorTitle,
           p_instructor_email: instructorEmail,
-          p_instructor_image: instructorImage
+          p_instructor_image: instructorImage,
+          p_semester: semester
         });
       
       if (sqlError) {
         console.error('Fallback SQL insert also failed:', sqlError);
-        return null;
+        
+        // Additional fallback using executeFunction for older deployments
+        try {
+          const { data: execData, error: execError } = await supabase.rpc('execute_sql_insert_course', {
+            p_title: title,
+            p_description: description,
+            p_image_url: imageUrl,
+            p_background_color: backgroundColor,
+            p_created_by: createdBy,
+            p_semester: semester
+          });
+          
+          if (execError) {
+            console.error('Execute SQL fallback also failed:', execError);
+            return null;
+          }
+          
+          return execData;
+        } catch (execException) {
+          console.error('Exception in execute SQL fallback:', execException);
+          return null;
+        }
       }
       
       return sqlData;

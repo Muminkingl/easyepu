@@ -272,21 +272,68 @@ export async function updateCourseFile(
       return false;
     }
 
-    const { error } = await supabase
-      .from('courses')
-      .update({
-        file_url: fileUrl,
-        file_name: fileName,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', courseId);
+    // First check which columns exist in the table
+    try {
+      const { data: columnInfo, error: columnError } = await supabase
+        .from('courses')
+        .select('*')
+        .eq('id', courseId)
+        .limit(1)
+        .single();
+      
+      if (columnError) {
+        console.error('Error checking course columns:', columnError);
+      } else {
+        // Determine which columns to use
+        const updateData: Record<string, any> = {
+          updated_at: new Date().toISOString()
+        };
+        
+        // If file_url/file_name columns exist, use them
+        if ('file_url' in columnInfo) updateData.file_url = fileUrl;
+        if ('file_name' in columnInfo) updateData.file_name = fileName;
+        
+        // If syllabus_url/syllabus_name columns exist as alternatives, use them
+        if ('syllabus_url' in columnInfo) updateData.syllabus_url = fileUrl;
+        if ('syllabus_name' in columnInfo) updateData.syllabus_name = fileName;
+        
+        // Update the record with the appropriate columns
+        const { error: updateError } = await supabase
+          .from('courses')
+          .update(updateData)
+          .eq('id', courseId);
 
-    if (error) {
-      console.error('Error updating course file record:', error);
-      return false;
+        if (!updateError) {
+          return true;
+        }
+        
+        console.error('Error updating with dynamic columns:', updateError);
+      }
+    } catch (columnCheckError) {
+      console.error('Error during column check:', columnCheckError);
     }
 
-    return true;
+    // Traditional approach as fallback
+    try {
+      const { error } = await supabase
+        .from('courses')
+        .update({
+          file_url: fileUrl,
+          file_name: fileName,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', courseId);
+
+      if (!error) {
+        return true;
+      }
+      
+      console.error('Error updating course file record:', error);
+    } catch (updateError) {
+      console.error('Error in traditional update:', updateError);
+    }
+
+    return false;
   } catch (error) {
     console.error('Error updating course file record:', error);
     return false;
@@ -307,24 +354,92 @@ export async function getCourseFile(
       return null;
     }
 
-    const { data, error } = await supabase
-      .from('courses')
-      .select('file_url, file_name')
-      .eq('id', courseId)
-      .single();
-
-    if (error) {
-      console.error('Error fetching course file data:', error);
-      return null;
-    }
-
-    if (data.file_url && data.file_name) {
-      return {
-        url: data.file_url,
-        name: data.file_name
-      };
+    // First, try a general select to see what columns are actually available
+    try {
+      const { data: columnInfo, error: columnError } = await supabase
+        .from('courses')
+        .select('*')
+        .eq('id', courseId)
+        .limit(1)
+        .single();
+      
+      if (columnError) {
+        console.error('Error checking course columns:', columnError);
+      } else if (columnInfo) {
+        // Check which columns exist
+        const hasFileUrl = 'file_url' in columnInfo;
+        const hasFileName = 'file_name' in columnInfo;
+        const hasSyllabusUrl = 'syllabus_url' in columnInfo;
+        const hasSyllabusName = 'syllabus_name' in columnInfo;
+        
+        // If we have file_url and file_name, use those
+        if (hasFileUrl && hasFileName && columnInfo.file_url && columnInfo.file_name) {
+          return {
+            url: columnInfo.file_url,
+            name: columnInfo.file_name
+          };
+        }
+        
+        // If we have syllabus_url and syllabus_name, use those as alternatives
+        if (hasSyllabusUrl && hasSyllabusName && columnInfo.syllabus_url && columnInfo.syllabus_name) {
+          return {
+            url: columnInfo.syllabus_url,
+            name: columnInfo.syllabus_name
+          };
+        }
+        
+        // Check for any other potential file columns
+        for (const [key, value] of Object.entries(columnInfo)) {
+          if (
+            (key.includes('file') || key.includes('document') || key.includes('attachment')) && 
+            typeof value === 'string' && 
+            (value.startsWith('http') || value.startsWith('blob:'))
+          ) {
+            // Found a URL-like value in a column with 'file' in the name
+            const nameKey = key.replace('url', 'name');
+            if (nameKey in columnInfo && typeof columnInfo[nameKey] === 'string') {
+              return {
+                url: value,
+                name: columnInfo[nameKey] as string
+              };
+            } else {
+              // If we can't find a matching name column, just use the URL with a generic name
+              return {
+                url: value,
+                name: 'Course File'
+              };
+            }
+          }
+        }
+      }
+    } catch (lookupError) {
+      console.error('Error during column exploration:', lookupError);
     }
     
+    // Traditional approach as fallback - might fail with the error we're trying to fix
+    try {
+      const { data, error } = await supabase
+        .from('courses')
+        .select('file_url, file_name')
+        .eq('id', courseId)
+        .single();
+
+      if (error) {
+        console.error('Error fetching course file data:', error);
+        return null;
+      }
+
+      if (data && data.file_url && data.file_name) {
+        return {
+          url: data.file_url,
+          name: data.file_name
+        };
+      }
+    } catch (queryError) {
+      console.error('Error in traditional file query:', queryError);
+    }
+    
+    // If we get here, we couldn't find file data
     return null;
   } catch (error) {
     console.error('Error fetching course file:', error);
@@ -350,5 +465,113 @@ export async function deleteCourseFile(fileUrl: string): Promise<boolean> {
   } catch (error) {
     console.error('Error deleting course file:', error);
     return false;
+  }
+}
+
+/**
+ * Upload a course section file to Vercel Blob
+ * @param file The file to upload
+ * @param sectionId The section ID
+ * @returns A promise that resolves to an object with file URL, type and size if successful, or null if failed
+ */
+export async function uploadSectionFile(file: File, sectionId: string): Promise<{ url: string, type: string, size: string } | null> {
+  try {
+    // Generate a unique filename
+    const timestamp = Date.now();
+    const filename = `sections/${sectionId}/${timestamp}-${file.name}`;
+    
+    // Get file extension for type
+    const fileType = file.name.split('.').pop()?.toLowerCase() || 'unknown';
+    
+    // Calculate file size
+    const fileSize = formatFileSize(file.size);
+
+    // Upload to Vercel Blob
+    const blob = await put(filename, file, {
+      access: 'public',
+    });
+    
+    // Return the URL and metadata
+    return {
+      url: blob.url,
+      type: fileType,
+      size: fileSize
+    };
+  } catch (error) {
+    console.error('Error uploading section file:', error);
+    return null;
+  }
+}
+
+/**
+ * Format file size in a human readable format
+ */
+function formatFileSize(bytes: number): string {
+  if (bytes === 0) return '0 Bytes';
+  
+  const k = 1024;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+/**
+ * Delete a section file from storage
+ * @param fileUrl The URL of the file to delete
+ * @returns A promise that resolves to true if successful, or false if failed
+ */
+export async function deleteSectionFile(fileUrl: string): Promise<boolean> {
+  try {
+    if (!fileUrl) {
+      console.error('No file URL provided for deletion');
+      return false;
+    }
+    
+    // Check if this is actually a Vercel Blob URL
+    // Only attempt deletion for URLs that match Vercel Blob pattern
+    const isVercelBlobUrl = fileUrl.includes('vercel-storage.com') || 
+                            fileUrl.includes('blob.vercel.app');
+    
+    if (isVercelBlobUrl) {
+      try {
+        // Only try to delete if it looks like a Vercel URL
+        await del(fileUrl);
+        console.log('Successfully deleted file from Vercel Blob:', fileUrl);
+      } catch (error: any) {
+        // Cast to any to access toString() and check error message
+        const errorMessage = error?.toString() || '';
+        
+        // If there's a token error, log it but don't fail the operation
+        if (errorMessage.includes('No token found') || 
+            errorMessage.includes('BLOB_READ_WRITE_TOKEN')) {
+          console.warn('Cannot delete file from Vercel Blob due to missing token. File URL:', fileUrl);
+          console.warn('Set up BLOB_READ_WRITE_TOKEN environment variable for file deletion.');
+          
+          // In development, we can still consider this a "success" as the database record will be removed
+          if (process.env.NODE_ENV === 'development') {
+            console.log('Running in development mode - considering delete successful despite token issue');
+            return true;
+          }
+        } else {
+          // For other errors, log and propagate
+          console.error('Error deleting file from Vercel Blob:', error);
+          throw error;
+        }
+      }
+    } else if (fileUrl.startsWith('blob:') || fileUrl.startsWith('http://localhost')) {
+      // For temporary blob URLs or local development URLs, no deletion needed
+      console.log('Skipping deletion for temporary or local URL:', fileUrl);
+    } else {
+      // For other URLs (like external links), no deletion needed
+      console.log('URL does not appear to be a Vercel Blob URL, skipping deletion:', fileUrl);
+    }
+    
+    // Return true even if we couldn't delete the file - the database record will still be removed
+    return true;
+  } catch (error) {
+    console.error('Error in deleteSectionFile:', error);
+    // Return true anyway so database operations can continue
+    return true;
   }
 } 

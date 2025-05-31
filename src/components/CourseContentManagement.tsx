@@ -31,6 +31,7 @@ interface CourseContentManagementProps {
   // Methods
   toggleSection: (sectionId: string) => void;
   confirmDeleteSection: (sectionId: string, e: React.MouseEvent) => void;
+  confirmDeleteFile: (fileId: string) => void;
   handleDeleteFile: (fileId: string) => void;
   setAddingSectionMode: (mode: boolean) => void;
   setAddingFileMode: (mode: boolean) => void;
@@ -61,6 +62,7 @@ export const CourseContentManagement: React.FC<CourseContentManagementProps> = (
   fileInputRef,
   toggleSection,
   confirmDeleteSection,
+  confirmDeleteFile,
   handleDeleteFile,
   setAddingSectionMode,
   setAddingFileMode,
@@ -228,7 +230,7 @@ export const CourseContentManagement: React.FC<CourseContentManagementProps> = (
                                     </div>
                                     <button
                                       type="button"
-                                      onClick={() => handleDeleteFile(file.id)}
+                                      onClick={() => confirmDeleteFile(file.id)}
                                       className="p-2 rounded-lg bg-gradient-to-br from-red-900/40 to-red-800/40 hover:from-red-800/50 hover:to-red-700/50 transition-all duration-300 opacity-0 group-hover/file:opacity-100"
                                       title="Delete file"
                                     >

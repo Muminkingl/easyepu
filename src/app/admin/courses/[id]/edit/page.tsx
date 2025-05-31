@@ -11,7 +11,8 @@ import {
   createCourseSectionAction, 
   createCourseFileAction,
   deleteCourseSectionAction,
-  deleteCourseFileAction
+  deleteCourseFileAction,
+  uploadSectionFileAction
 } from '@/lib/actions';
 import { getCourseById, Course, CourseSection, CourseFile, getUserData } from '@/lib/supabase';
 import { useUser } from '@clerk/nextjs';
@@ -20,9 +21,11 @@ import {
   AlertTriangle, 
   Loader2, 
   BookOpen, 
-  Palette
+  Palette,
+  Save
 } from 'lucide-react';
 import CourseContentManagement from '@/components/CourseContentManagement';
+import { uploadSectionFile, deleteSectionFile } from '@/lib/storage';
 
 // Available background colors
 const backgroundColors = [
@@ -86,6 +89,10 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
   const [addingFileMode, setAddingFileMode] = useState(false);
   const [deletingSectionId, setDeletingSectionId] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  
+  // For file deletion confirmation
+  const [deletingFileId, setDeletingFileId] = useState<string | null>(null);
+  const [showDeleteFileConfirm, setShowDeleteFileConfirm] = useState(false);
   
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -318,15 +325,24 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
       
       // Handle file upload if a file was selected
       if (fileUpload) {
-        // In a real implementation, we would upload the file to a storage service
-        // and get back a URL. For now, we'll simulate this.
-        fileUrl = URL.createObjectURL(fileUpload); // This is temporary and for demo purposes
-        fileType = fileUpload.type.split('/')[1] || 'unknown';
-        fileSize = formatFileSize(fileUpload.size);
+        // Upload the file to Vercel Blob storage using our server action
+        const uploadResult = await uploadSectionFileAction(fileUpload, selectedSectionId);
         
-        // In production, you would upload the file to your storage service
-        // const { url } = await uploadFile(fileUpload);
-        // fileUrl = url;
+        if (uploadResult) {
+          fileUrl = uploadResult.url;
+          fileType = uploadResult.type;
+          fileSize = uploadResult.size;
+        } else {
+          throw new Error('Failed to upload file');
+        }
+      } else if (newFileUrl) {
+        // If we're just using an external URL, set a default file size
+        fileSize = 'External Link';
+      } else {
+        // Neither file nor URL provided
+        setError('Please provide either a file to upload or an external URL');
+        setSubmitting(false);
+        return;
       }
       
       const newFileId = await createCourseFileAction(
@@ -366,7 +382,7 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
       }
     } catch (err) {
       console.error('Error adding file:', err);
-      setError('Failed to add file');
+      setError('Failed to add file. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -449,15 +465,42 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
     setDeletingSectionId(null);
   };
 
-  const handleDeleteFile = async (fileId: string) => {
+  // Confirm file deletion
+  const confirmDeleteFile = (fileId: string) => {
+    setDeletingFileId(fileId);
+    setShowDeleteFileConfirm(true);
+  };
+  
+  // Cancel file deletion
+  const cancelDeleteFile = () => {
+    setShowDeleteFileConfirm(false);
+    setDeletingFileId(null);
+  };
+
+  const handleDeleteFile = async () => {
+    if (!deletingFileId) return;
+    
     try {
       setSubmitting(true);
       
-      const success = await deleteCourseFileAction(fileId);
+      // Find the file to get its URL before deletion
+      const fileToDelete = files.find(file => file.id === deletingFileId);
+      
+      const success = await deleteCourseFileAction(deletingFileId);
       
       if (success) {
+        // If this is an uploaded file (not just a link), delete it from storage
+        if (fileToDelete?.file_url && !fileToDelete.file_url.startsWith('blob:') && !fileToDelete.file_url.startsWith('http://localhost')) {
+          // Delete the actual file from Vercel Blob
+          await deleteSectionFile(fileToDelete.file_url);
+        }
+        
         // Remove from local state
-        setFiles(prev => prev.filter(file => file.id !== fileId));
+        setFiles(prev => prev.filter(file => file.id !== deletingFileId));
+        
+        // Close the confirmation dialog
+        setShowDeleteFileConfirm(false);
+        setDeletingFileId(null);
       } else {
         throw new Error('Failed to delete file');
       }
@@ -819,6 +862,7 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
               fileInputRef={fileInputRef}
               toggleSection={toggleSection}
               confirmDeleteSection={confirmDeleteSection}
+              confirmDeleteFile={confirmDeleteFile}
               handleDeleteFile={handleDeleteFile}
               setAddingSectionMode={setAddingSectionMode}
               setAddingFileMode={setAddingFileMode}
@@ -826,6 +870,7 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
               setNewFileName={setNewFileName}
               setNewFileType={setNewFileType}
               setNewFileUrl={setNewFileUrl}
+              setSelectedSectionId={setSelectedSectionId}
               handleAddSection={handleAddSection}
               handleAddFile={handleAddFile}
               handleFileChange={handleFileChange}
@@ -839,38 +884,78 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
               >
                 Cancel
               </Link>
-              <button
-                type="button"
-                onClick={handleSubmit}
-                disabled={submitting}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md shadow-sm border border-indigo-500 transition-colors"
-              >
-                {submitting ? 'Saving...' : 'Save Changes'}
-              </button>
+              <div className="flex justify-end mt-6">
+                <button
+                  type="button"
+                  onClick={handleSubmit}
+                  disabled={submitting}
+                  className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white text-sm font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:from-indigo-600 disabled:hover:to-indigo-700"
+                >
+                  {submitting ? (
+                    <>
+                      <Loader2 className="animate-spin -ml-1 mr-2 h-4 w-4" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4 mr-2" />
+                      Save Changes
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Confirmation dialog for section deletion */}
+        {/* Delete Section Confirmation Dialog */}
         {showDeleteConfirm && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-            <div className="bg-indigo-900 border border-indigo-700 rounded-xl shadow-xl p-6 max-w-md w-full mx-4">
-              <h3 className="text-lg font-semibold text-indigo-100 mb-2">Confirm Deletion</h3>
-              <p className="text-indigo-300 mb-4">
-                Are you sure you want to delete this section? This will also delete all files within this section. This action cannot be undone.
+          <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+            <div className="bg-indigo-900/95 backdrop-blur-md rounded-xl border border-indigo-700/50 p-6 max-w-md w-full shadow-2xl">
+              <h3 className="text-xl font-bold text-indigo-100 mb-4">Delete Section</h3>
+              <p className="text-indigo-300 mb-6">
+                Are you sure you want to delete this section? This action cannot be undone and will remove all files associated with this section.
               </p>
-              <div className="flex justify-end space-x-3">
+              <div className="flex space-x-3 justify-end">
                 <button
                   type="button"
                   onClick={cancelDeleteSection}
-                  className="px-4 py-2 bg-indigo-800 text-indigo-200 rounded-md hover:bg-indigo-700"
+                  className="px-4 py-2 bg-indigo-800/50 hover:bg-indigo-700/50 text-indigo-300 hover:text-indigo-100 rounded-lg transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="button"
                   onClick={handleDeleteSection}
-                  className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+                  className="px-4 py-2 bg-red-700/60 hover:bg-red-600/60 text-white rounded-lg transition-colors"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Delete File Confirmation Dialog */}
+        {showDeleteFileConfirm && (
+          <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+            <div className="bg-indigo-900/95 backdrop-blur-md rounded-xl border border-indigo-700/50 p-6 max-w-md w-full shadow-2xl">
+              <h3 className="text-xl font-bold text-indigo-100 mb-4">Delete File</h3>
+              <p className="text-indigo-300 mb-6">
+                Are you sure you want to delete this file? This action cannot be undone.
+              </p>
+              <div className="flex space-x-3 justify-end">
+                <button
+                  type="button"
+                  onClick={cancelDeleteFile}
+                  className="px-4 py-2 bg-indigo-800/50 hover:bg-indigo-700/50 text-indigo-300 hover:text-indigo-100 rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDeleteFile}
+                  className="px-4 py-2 bg-red-700/60 hover:bg-red-600/60 text-white rounded-lg transition-colors"
                 >
                   Delete
                 </button>

@@ -63,7 +63,9 @@ import {
   uploadCourseFile,
   getCourseFile,
   updateCourseFile,
-  deleteCourseFile as deleteCourseFileFromStorage
+  deleteCourseFile as deleteCourseFileFromStorage,
+  uploadSectionFile,
+  deleteSectionFile
 } from './storage';
 
 /**
@@ -1135,6 +1137,32 @@ export async function getCourseFileAction(
     return await getCourseFile(courseId);
   } catch (error) {
     console.error('Error in getCourseFileAction:', error);
+    return null;
+  }
+}
+
+/**
+ * Upload a section file
+ * @param file The file to upload
+ * @param sectionId The section ID
+ * @returns A promise that resolves to the file data if successful
+ */
+export async function uploadSectionFileAction(
+  file: File,
+  sectionId: string
+): Promise<{ url: string; type: string; size: string } | null> {
+  try {
+    // Call the storage function directly instead of using the API
+    const result = await uploadSectionFile(file, sectionId);
+    
+    if (!result) {
+      console.error('Failed to upload file using direct storage function');
+      return null;
+    }
+    
+    return result;
+  } catch (error) {
+    console.error('Error in uploadSectionFileAction:', error);
     return null;
   }
 } 
