@@ -20,18 +20,9 @@ import {
   AlertTriangle, 
   Loader2, 
   BookOpen, 
-  Palette, 
-  PlusCircle, 
-  Edit2, 
-  Trash2, 
-  FileIcon, 
-  FolderIcon, 
-  ChevronDown, 
-  ChevronUp,
-  Upload,
-  Link2,
-  FileUp
+  Palette
 } from 'lucide-react';
+import CourseContentManagement from '@/components/CourseContentManagement';
 
 // Available background colors
 const backgroundColors = [
@@ -811,268 +802,40 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
               </div>
             </div>
 
-            <div className="pt-6 border-t border-indigo-800/30">
-              <h3 className="text-lg font-medium text-indigo-100 mb-4">Course Content</h3>
-              
-              {/* Sections List */}
-              <div className="space-y-4 mb-6">
-                {sections.length === 0 ? (
-                  <div className="text-center py-10 bg-indigo-800/20 rounded-lg border border-indigo-700/30">
-                    <FolderIcon className="h-12 w-12 text-indigo-400 mx-auto mb-3" />
-                    <p className="text-indigo-300">No sections added yet. Add your first section below.</p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {sections.map((section) => (
-                      <div key={section.id} className="border border-indigo-700/50 rounded-md overflow-hidden">
-                        {/* Section Header */}
-                        <div 
-                          className={`flex items-center justify-between p-3 cursor-pointer ${
-                            expandedSections.includes(section.id) ? 'bg-indigo-700/40' : 'bg-indigo-800/30'
-                          } hover:bg-indigo-700/30`}
-                          onClick={() => toggleSection(section.id)}
-                        >
-                          <div className="flex items-center">
-                            <FolderIcon className={`h-5 w-5 mr-2 ${
-                              expandedSections.includes(section.id) ? 'text-indigo-300' : 'text-indigo-400'
-                            }`} />
-                            <span className="font-medium text-indigo-100">{section.title}</span>
-                          </div>
-                          <div className="flex items-center">
-                            <button 
-                              type="button"
-                              onClick={(e) => confirmDeleteSection(section.id, e)}
-                              className="p-1 text-gray-400 hover:text-red-500 mr-2"
-                              title="Delete section"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                            {expandedSections.includes(section.id) ? (
-                              <ChevronUp className="h-5 w-5 text-gray-400" />
-                            ) : (
-                              <ChevronDown className="h-5 w-5 text-gray-400" />
-                            )}
-                          </div>
-                        </div>
-                        
-                        {/* Section Content (Files) */}
-                        {expandedSections.includes(section.id) && (
-                          <div className="p-3 bg-[#0f0c24] border-t border-indigo-800/30">
-                            {/* Files list */}
-                            {files.length === 0 ? (
-                              <p className="text-sm text-indigo-300 py-2">No files in this section yet.</p>
-                            ) : (
-                              <div className="space-y-2 mb-3">
-                                {files
-                                  .filter(file => file.section_id === section.id)
-                                  .map(file => (
-                                    <div 
-                                      key={file.id} 
-                                      className="flex items-center justify-between bg-[#131033] p-2 rounded-md mb-1 border border-indigo-900/40"
-                                    >
-                                      <div className="flex items-center">
-                                        <FileIcon className="h-4 w-4 text-indigo-300 mr-2" />
-                                        <div>
-                                          <div className="text-sm font-medium text-indigo-100">{file.title}</div>
-                                          <div className="text-xs text-indigo-300">
-                                            {file.file_type.toUpperCase()} • {file.file_size}
-                                            {file.file_url && (
-                                              <a 
-                                                href={file.file_url}
-                                                target="_blank"
-                                                rel="noopener noreferrer" 
-                                                className="ml-2 text-indigo-400 hover:text-indigo-200"
-                                              >
-                                                View
-                                              </a>
-                                            )}
-                                          </div>
-                                        </div>
-                                      </div>
-                                      <button
-                                        type="button"
-                                        onClick={() => handleDeleteFile(file.id)}
-                                        className="p-1 text-indigo-400 hover:text-red-400 rounded-full"
-                                        title="Delete file"
-                                      >
-                                        <Trash2 className="h-4 w-4" />
-                                      </button>
-                                    </div>
-                                  ))}
-                              </div>
-                            )}
-                            
-                            {/* Add file form */}
-                            {addingFileMode && selectedSectionId === section.id ? (
-                              <div className="bg-[#0c0a1f] p-3 rounded border border-indigo-800/30">
-                                <h4 className="text-sm font-medium mb-2 text-indigo-100">Add New File</h4>
-                                <div className="space-y-3">
-                                  <div>
-                                    <label htmlFor="fileName" className="block text-xs font-medium text-indigo-300 mb-1">
-                                      File Name *
-                                    </label>
-                                    <input
-                                      type="text"
-                                      id="fileName"
-                                      value={newFileName}
-                                      onChange={(e) => setNewFileName(e.target.value)}
-                                      className="w-full px-2 py-1 text-sm bg-indigo-800/30 border border-indigo-700/50 rounded text-indigo-100"
-                                      placeholder="e.g., Course Syllabus"
-                                      required
-                                    />
-                                  </div>
-                                  
-                                  <div>
-                                    <label htmlFor="fileUpload" className="block text-xs font-medium text-indigo-300 mb-1">
-                                      Upload File
-                                    </label>
-                                    <input
-                                      type="file"
-                                      id="fileUpload"
-                                      ref={fileInputRef}
-                                      onChange={handleFileChange}
-                                      className="w-full px-2 py-1 text-sm text-indigo-300 bg-indigo-800/30 border border-indigo-700/50 rounded file:bg-indigo-700/50 file:text-indigo-100 file:border-none file:rounded file:px-2 file:py-1 file:mr-2 file:cursor-pointer"
-                                    />
-                                    {fileUpload && (
-                                      <p className="mt-1 text-xs text-green-400">
-                                        Ready to upload: {fileUpload.name} ({formatFileSize(fileUpload.size)})
-                                      </p>
-                                    )}
-                                  </div>
-                                  
-                                  <div>
-                                    <p className="text-xs text-indigo-400 mb-1">- OR -</p>
-                                    <label htmlFor="fileUrl" className="block text-xs font-medium text-indigo-300 mb-1">
-                                      External Link URL
-                                    </label>
-                                    <div className="flex items-center">
-                                      <Link2 className="h-4 w-4 text-indigo-400 mr-2" />
-                                      <input
-                                        type="url"
-                                        id="fileUrl"
-                                        value={newFileUrl}
-                                        onChange={(e) => setNewFileUrl(e.target.value)}
-                                        className="flex-1 px-2 py-1 text-sm bg-indigo-800/30 border border-indigo-700/50 rounded text-indigo-100"
-                                        placeholder="https://example.com/file.pdf"
-                                      />
-                                    </div>
-                                  </div>
-                                  
-                                  <div className="pt-2">
-                                    <label htmlFor="fileType" className="block text-xs font-medium text-indigo-300 mb-1">
-                                      File Type *
-                                    </label>
-                                    <select
-                                      id="fileType"
-                                      value={newFileType}
-                                      onChange={(e) => setNewFileType(e.target.value)}
-                                      className="w-full px-2 py-1 text-sm bg-indigo-800/30 border border-indigo-700/50 rounded text-indigo-100"
-                                    >
-                                      <option value="pdf">PDF</option>
-                                      <option value="docx">Word (DOCX)</option>
-                                      <option value="pptx">PowerPoint (PPTX)</option>
-                                      <option value="xlsx">Excel (XLSX)</option>
-                                      <option value="txt">Text (TXT)</option>
-                                      <option value="zip">Archive (ZIP)</option>
-                                      <option value="other">Other</option>
-                                    </select>
-                                  </div>
-                                  
-                                  <div className="flex justify-end space-x-2 pt-2">
-                                    <button
-                                      type="button"
-                                      onClick={() => setAddingFileMode(false)}
-                                      className="px-3 py-1 text-xs text-indigo-300 hover:bg-indigo-800/50 rounded border border-indigo-700/30"
-                                    >
-                                      Cancel
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={handleAddFile}
-                                      disabled={submitting}
-                                      className="px-3 py-1 text-xs bg-indigo-700/50 hover:bg-indigo-600/50 text-white rounded"
-                                    >
-                                      {submitting ? 'Adding...' : 'Add File'}
-                                    </button>
-                                  </div>
-                                </div>
-                              </div>
-                            ) : (
-                              <button 
-                                type="button"
-                                onClick={() => {
-                                  setSelectedSectionId(section.id);
-                                  setAddingFileMode(true);
-                                }}
-                                className="mt-2 inline-flex items-center text-xs text-indigo-300 hover:text-indigo-100"
-                              >
-                                <PlusCircle className="h-3 w-3 mr-1" />
-                                Add File
-                              </button>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-              
-              {/* Add Section div replaces form */}
-              {addingSectionMode ? (
-                <div className="bg-[#0c0a1f] p-4 border border-indigo-800/30 rounded-md mb-4">
-                  <h4 className="text-sm font-medium mb-2 text-indigo-100">Add New Section</h4>
-                  <div className="space-y-3">
-                    <div>
-                      <label htmlFor="sectionTitle" className="block text-xs font-medium text-indigo-300 mb-1">
-                        Section Title *
-                      </label>
-                      <input
-                        type="text"
-                        id="sectionTitle"
-                        value={newSectionTitle}
-                        onChange={(e) => setNewSectionTitle(e.target.value)}
-                        className="w-full px-3 py-2 bg-indigo-800/30 border border-indigo-700/50 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-indigo-100"
-                        placeholder="e.g., Introduction"
-                        required
-                      />
-                    </div>
-                    
-                    <div className="flex justify-end space-x-2 pt-2">
-                      <button
-                        type="button"
-                        onClick={() => setAddingSectionMode(false)}
-                        className="px-3 py-1 text-sm text-indigo-300 hover:bg-indigo-800/50 rounded border border-indigo-700/30"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleAddSection}
-                        disabled={submitting}
-                        className="px-3 py-1 bg-indigo-700/50 hover:bg-indigo-600/50 text-white text-sm rounded"
-                      >
-                        {submitting ? 'Adding...' : 'Add Section'}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <button 
-                  type="button"
-                  onClick={() => setAddingSectionMode(true)}
-                  className="inline-flex items-center text-sm text-indigo-300 hover:text-indigo-100"
-                >
-                  <PlusCircle className="h-4 w-4 mr-1" />
-                  Add Section
-                </button>
-              )}
-            </div>
+            {/* Replace Course Content section with the component */}
+            <CourseContentManagement
+              sections={sections}
+              files={files}
+              expandedSections={expandedSections}
+              selectedSectionId={selectedSectionId}
+              submitting={submitting}
+              addingSectionMode={addingSectionMode}
+              addingFileMode={addingFileMode}
+              newSectionTitle={newSectionTitle}
+              newFileName={newFileName}
+              newFileType={newFileType}
+              newFileUrl={newFileUrl}
+              fileUpload={fileUpload}
+              fileInputRef={fileInputRef}
+              toggleSection={toggleSection}
+              confirmDeleteSection={confirmDeleteSection}
+              handleDeleteFile={handleDeleteFile}
+              setAddingSectionMode={setAddingSectionMode}
+              setAddingFileMode={setAddingFileMode}
+              setNewSectionTitle={setNewSectionTitle}
+              setNewFileName={setNewFileName}
+              setNewFileType={setNewFileType}
+              setNewFileUrl={setNewFileUrl}
+              handleAddSection={handleAddSection}
+              handleAddFile={handleAddFile}
+              handleFileChange={handleFileChange}
+              formatFileSize={formatFileSize}
+            />
 
-            <div className="pt-4 flex justify-end space-x-3">
+            <div className="pt-6 border-t border-indigo-800/30 flex justify-between">
               <Link
-                href="/admin/courses"
-                className="px-4 py-2 border border-indigo-800/30 rounded-md text-indigo-300 hover:bg-indigo-800/30"
+                href={`/admin/courses/${courseId}`}
+                className="px-4 py-2 bg-indigo-800/30 text-indigo-300 hover:bg-indigo-700/30 hover:text-indigo-100 rounded-md border border-indigo-700/30 transition-colors"
               >
                 Cancel
               </Link>
@@ -1080,44 +843,42 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                 type="button"
                 onClick={handleSubmit}
                 disabled={submitting}
-                className="px-4 py-2 bg-indigo-700/50 hover:bg-indigo-600/50 text-white rounded-md"
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md shadow-sm border border-indigo-500 transition-colors"
               >
                 {submitting ? 'Saving...' : 'Save Changes'}
               </button>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Delete confirmation modal */}
-      {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-[#0c0a1f] rounded-lg shadow-xl p-6 max-w-md w-full border border-indigo-800/30">
-            <h3 className="text-lg font-medium text-indigo-100 mb-4">Confirm Deletion</h3>
-            <p className="text-indigo-300 mb-6">
-              Are you sure you want to delete this section and all its files? This action cannot be undone.
-            </p>
-            <div className="flex justify-end space-x-3">
-              <button
-                type="button"
-                onClick={cancelDeleteSection}
-                className="px-4 py-2 border border-indigo-800/30 rounded-md text-indigo-300 hover:bg-indigo-800/30"
-                disabled={submitting}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleDeleteSection}
-                className="px-4 py-2 bg-red-900/50 text-white rounded-md hover:bg-red-800/50 disabled:opacity-50"
-                disabled={submitting}
-              >
-                {submitting ? 'Deleting...' : 'Delete Section'}
-              </button>
+        {/* Confirmation dialog for section deletion */}
+        {showDeleteConfirm && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+            <div className="bg-indigo-900 border border-indigo-700 rounded-xl shadow-xl p-6 max-w-md w-full mx-4">
+              <h3 className="text-lg font-semibold text-indigo-100 mb-2">Confirm Deletion</h3>
+              <p className="text-indigo-300 mb-4">
+                Are you sure you want to delete this section? This will also delete all files within this section. This action cannot be undone.
+              </p>
+              <div className="flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={cancelDeleteSection}
+                  className="px-4 py-2 bg-indigo-800 text-indigo-200 rounded-md hover:bg-indigo-700"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDeleteSection}
+                  className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+                >
+                  Delete
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
