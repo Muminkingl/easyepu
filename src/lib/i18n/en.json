@@ -355,8 +355,9 @@
     }
   },
   "coursesPage": {
-    "title": "My Courses",
+    "title": "Courses",
     "subtitle": "Browse all available courses or view your saved items",
+    "semesterFilter": "Showing courses for Semester",
     "search": "Search courses by title or description",
     "filters": "Filters",
     "refresh": "Refresh",

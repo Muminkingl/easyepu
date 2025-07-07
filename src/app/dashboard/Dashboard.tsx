@@ -58,33 +58,33 @@ export default function Dashboard() {
     }
   }, [isLoaded, isSignedIn, user, router, pathname, userData, isUserDataLoading]);
 
-  // Fetch courses when component loads
+  // Fetch course count for stats
   useEffect(() => {
-    const fetchCourses = async () => {
-      if (!loading && isLoaded && isSignedIn) {
+    const fetchCoursesCount = async () => {
+      if (user) {
         try {
           setIsLoadingCourses(true);
-          const courses = await getCourses();
-          
-          // Filter courses based on user's semester if available
-          if (userData?.semester) {
-            const semesterCourses = courses.filter(course => 
-              course.semester === userData.semester || !course.semester // Show courses with no semester set or matching the user's semester
-            );
-            setCoursesCount(semesterCourses.length);
+          const courses = await getCourses(user.id);
+          // Only count courses matching the user's semester
+          if (courses?.length > 0 && userData?.semester) {
+            const filteredCourses = courses.filter(course => course.semester === userData.semester);
+            setCoursesCount(filteredCourses.length);
           } else {
-            setCoursesCount(courses.length);
+            setCoursesCount(0);
           }
         } catch (error) {
           console.error("Error fetching courses:", error);
+          setCoursesCount(0);
         } finally {
           setIsLoadingCourses(false);
         }
       }
     };
-
-    fetchCourses();
-  }, [loading, isLoaded, isSignedIn, userData?.semester]);
+    
+    if (!isUserDataLoading && userData) {
+      fetchCoursesCount();
+    }
+  }, [user, userData, isUserDataLoading]);
 
   // Listen for sidebar toggle events
   useEffect(() => {

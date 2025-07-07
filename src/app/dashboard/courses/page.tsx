@@ -126,6 +126,11 @@ export default function CoursesPage() {
     
     let filtered = [...courses];
     
+    // Filter courses by user semester
+    if (userSemester !== null) {
+      filtered = filtered.filter(course => course.semester === userSemester);
+    }
+    
     // Apply search filter
     if (searchTerm) {
       filtered = filtered.filter(course => 
@@ -143,7 +148,7 @@ export default function CoursesPage() {
     }
     
     setFilteredCourses(filtered);
-  }, [courses, searchTerm, activeCategory, savedCourses]);
+  }, [courses, searchTerm, activeCategory, savedCourses, userSemester]);
 
   // Save/unsave a course
   const toggleSaveCourse = (id: string) => {
@@ -323,6 +328,13 @@ export default function CoursesPage() {
           <div className="flex flex-col md:flex-row md:items-center md:justify-between">
             <div>
               <p className="text-indigo-300">{t('coursesPage.subtitle')}</p>
+              {userSemester && (
+                <p className="text-indigo-400 text-sm mt-2">
+                  <span className="bg-indigo-900/50 px-2 py-1 rounded-md">
+                    {t('coursesPage.semesterFilter', { fallback: 'Showing courses for Semester' })} {userSemester}
+                  </span>
+                </p>
+              )}
             </div>
             <div className="mt-4 md:mt-0">
               <button
