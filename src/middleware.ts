@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 // Define public routes that don't require authentication
-const isPublicRoute = createRouteMatcher(["/", "/unauthorized", "/sign-in", "/sign-up"]);
+const isPublicRoute = createRouteMatcher(["/", "/unauthorized", "/sign-in", "/sign-up", "/privacy-policy", "/terms-of-service", "/cookie-policy"]);
 // Define admin routes that require admin role
 const isAdminRoute = createRouteMatcher(["/admin"]);
 // Define API routes that should be rate limited
