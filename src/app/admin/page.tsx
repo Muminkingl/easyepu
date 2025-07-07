@@ -215,11 +215,6 @@ export default function AdminDashboard() {
                 <span className="font-medium">Overview</span>
               </Link>
               
-              <Link href="/admin/announcements" className="group flex items-center px-4 py-3 text-indigo-200 rounded-xl hover:bg-indigo-800/40 transition-all">
-                <Bell className="mr-3 h-5 w-5 text-indigo-400 group-hover:text-indigo-300" />
-                <span>Announcements</span>
-              </Link>
-              
               <Link href="/admin/users" className="group flex items-center px-4 py-3 text-indigo-200 rounded-xl hover:bg-indigo-800/40 transition-all">
                 <Users className="mr-3 h-5 w-5 text-indigo-400 group-hover:text-indigo-300" />
                 <span>Users</span>
@@ -322,11 +317,6 @@ export default function AdminDashboard() {
                 <Link href="/admin" className="group flex items-center px-3 py-2.5 text-indigo-100 rounded-lg bg-indigo-700/60" onClick={toggleMobileMenu}>
                   <LayoutDashboard className="mr-3 h-5 w-5 text-indigo-300" />
                   <span className="font-medium">Overview</span>
-                </Link>
-                
-                <Link href="/admin/announcements" className="group flex items-center px-3 py-2.5 text-indigo-200 rounded-lg hover:bg-indigo-800/40 transition-all" onClick={toggleMobileMenu}>
-                  <Bell className="mr-3 h-5 w-5 text-indigo-400 group-hover:text-indigo-300" />
-                  <span>Announcements</span>
                 </Link>
                 
                 <Link href="/admin/users" className="group flex items-center px-3 py-2.5 text-indigo-200 rounded-lg hover:bg-indigo-800/40 transition-all" onClick={toggleMobileMenu}>

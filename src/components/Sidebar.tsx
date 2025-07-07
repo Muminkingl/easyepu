@@ -47,13 +47,6 @@ const getDefaultNavigation = (): NavItem[] => [
     descriptionKey: 'sidebar.profileDesc'
   },
   { 
-    nameKey: 'sidebar.announcements', 
-    href: '/dashboard/announcements', 
-    icon: BellIcon,
-    count: 0, // This will be dynamically updated
-    descriptionKey: 'sidebar.announcementsDesc'
-  },
-  { 
     nameKey: 'sidebar.courses', 
     href: '/dashboard/courses', 
     icon: BookOpenIcon,
@@ -89,38 +82,6 @@ export default function Sidebar() {
   useEffect(() => {
     setMounted(true);
   }, []);
-
-  // Update unread announcement count
-  useEffect(() => {
-    if (mounted) {
-      // Get initial unread count from window if available
-      if (typeof window !== 'undefined' && 'unreadAnnouncementsCount' in window) {
-        updateAnnouncementCount(window.unreadAnnouncementsCount);
-      }
-
-      // Listen for updates to unread count
-      const handleUnreadUpdate = (event: CustomEvent<{count: number}>) => {
-        updateAnnouncementCount(event.detail.count);
-      };
-
-      window.addEventListener('unreadAnnouncementsUpdated', handleUnreadUpdate as EventListener);
-
-      return () => {
-        window.removeEventListener('unreadAnnouncementsUpdated', handleUnreadUpdate as EventListener);
-      };
-    }
-  }, [mounted]);
-
-  // Function to update announcement count in navigation
-  const updateAnnouncementCount = (count: number) => {
-    setNavigation(prev => 
-      prev.map(item => 
-        item.nameKey === 'sidebar.announcements' 
-          ? { ...item, count: count || undefined } 
-          : item
-      )
-    );
-  };
 
   // Handle responsive design
   useEffect(() => {
