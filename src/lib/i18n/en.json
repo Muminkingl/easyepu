@@ -95,7 +95,11 @@
     "loading": "Loading...",
     "backToHome": "Back to Home",
     "save": "Save",
-    "saving": "Saving..."
+    "saving": "Saving...",
+    "errorTitle": "Error",
+    "cancel": "Cancel",
+    "continue": "Continue",
+    "processing": "Processing..."
   },
   "dashboard": {
     "loading": "Loading your dashboard...",
@@ -206,6 +210,8 @@
     "coursesDesc": "Access your enrolled courses",
     "presentationGroup": "Presentation Group",
     "presentationGroupDesc": "Manage your presentation groups",
+    "perks": "Perks",
+    "perksDesc": "Access special features and benefits",
     "toggleMenu": "Toggle menu",
     "toggleSidebar": "Toggle sidebar"
   },
@@ -504,5 +510,38 @@
     "subtitle": "This section is under construction",
     "message": "We're currently working on improving this section. Please check back later.",
     "returnButton": "Return to Dashboard"
+  },
+  "supportUs": {
+    "title": "EASY EPU Perks",
+    "subtitle": "Unlock special benefits and help support the platform",
+    "description": "Choose a tier to get exclusive badges and special features while helping us maintain and improve the platform for all students.",
+    "privacyTitle": "Your Privacy Is Our Priority",
+    "privacyDescription": "All payment information is handled securely through Paddle, a trusted payment processor. We never see or store your payment details.",
+    "supportButton": "Get Perks",
+    "confirmTitle": "Confirm Selection",
+    "redirectNotice": "When you click Continue, you'll be redirected to our secure payment processor.",
+    "securePayment": "Your payment information is securely processed by Paddle.",
+    "supportOptions": {
+      "small": {
+        "title": "Basic Tier",
+        "amount": "$5",
+        "description": "Get exclusive Bronze badge next to your name"
+      },
+      "medium": {
+        "title": "Standard Tier",
+        "amount": "$10",
+        "description": "Unlock Gold badge and priority access"
+      },
+      "large": {
+        "title": "Premium Tier",
+        "amount": "$20",
+        "description": "Get Diamond badge and all premium features"
+      }
+    },
+    "thankYou": {
+      "title": "Thank You for Your Support!",
+      "message": "Your badge and perks will be activated shortly.",
+      "returnButton": "Return to Dashboard"
+    }
   }
 } 

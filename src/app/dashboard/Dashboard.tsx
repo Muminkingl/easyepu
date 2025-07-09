@@ -38,12 +38,30 @@ export default function Dashboard() {
     }
     
     // If user email doesn't end with @epu.edu.iq, redirect to unauthorized
+    // TEMPORARILY DISABLED FOR TESTING
+    /*
     if (isLoaded && isSignedIn && user?.primaryEmailAddress?.emailAddress) {
       if (!user.primaryEmailAddress.emailAddress.endsWith('@epu.edu.iq')) {
         router.push('/unauthorized');
         return;
       }
       
+      // Check if semester is selected - require for all users including admins
+      if (!isUserDataLoading && userData && !userData.semester_selected) {
+        // Only show the message once user data is fully loaded
+        setSemesterRequired(true);
+        // If on dashboard home, redirect to profile to set semester
+        if (pathname === '/dashboard') {
+          router.push('/dashboard/profile');
+        }
+      }
+      
+      setLoading(false);
+    }
+    */
+    
+    // TEMPORARY CODE FOR TESTING - Allow all email domains
+    if (isLoaded && isSignedIn && user?.primaryEmailAddress?.emailAddress) {
       // Check if semester is selected - require for all users including admins
       if (!isUserDataLoading && userData && !userData.semester_selected) {
         // Only show the message once user data is fully loaded

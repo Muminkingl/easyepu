@@ -59,6 +59,20 @@ export default function TermsOfService() {
               </section>
               
               <section>
+                <h2 className="text-xl font-semibold mb-4">Refund Policy</h2>
+                <p>The following refund policy applies to all perks purchases made on the Easy EPU platform:</p>
+                <ul className="list-disc list-inside ml-4 mt-2">
+                  <li>All perks purchases that unlock special badges (Bronze, Gold, and Diamond) are non-refundable unless required by law.</li>
+                  <li>If you have made a purchase by mistake or in the wrong tier, please contact us within 7 days of the transaction.</li>
+                  <li>Requests for refunds will be considered on a case-by-case basis.</li>
+                  <li>If a refund is approved, it will be processed through the original payment method used.</li>
+                  <li>Badge and perks benefits will be removed if a refund is processed.</li>
+                  <li>For technical issues related to payments or if your badge is not showing properly, please contact us immediately with relevant details.</li>
+                </ul>
+                <p className="mt-2">For any questions regarding our perks or refund policy, please contact us at <a href="https://t.me/RtxMumin" className="text-indigo-400 hover:underline">Telegram</a>.</p>
+              </section>
+              
+              <section>
                 <h2 className="text-xl font-semibold mb-4">Limitation of Liability</h2>
                 <p>Easy EPU shall not be liable for any indirect, incidental, special, or consequential damages resulting from the use or inability to use the platform or services.</p>
               </section>
@@ -105,6 +119,20 @@ export default function TermsOfService() {
               <section>
                 <h2 className="text-xl font-semibold mb-4">موڵکی هزری</h2>
                 <p>هەموو ناوەڕۆکەکانی پلاتفۆرمی ئیزی ئی پی یو، لەوانە دەق، گرافیک، لۆگۆکان و سۆفتوێر، موڵکی ئیزی ئی پی یو یان دابینکەرانی ناوەڕۆکەکەیەتی و بە مافی چاپ و یاساکانی تری موڵکی هزری پارێزراوە.</p>
+              </section>
+              
+              <section>
+                <h2 className="text-xl font-semibold mb-4">سیاسەتی گەڕاندنەوەی پارە</h2>
+                <p>سیاسەتی گەڕاندنەوەی پارەی خوارەوە بۆ هەموو کڕینی پەرکەکان لە پلاتفۆرمی ئیزی ئی پی یو جێبەجێ دەکرێت:</p>
+                <ul className="list-disc list-inside mr-4 mt-2">
+                  <li>هەموو کڕینی پەرکەکان کە نیشانەی تایبەت دەکەنەوە (برۆنز، زێڕ، و ئەڵماس) ناگەڕێنرێنەوە مەگەر بە پێی یاسا پێویست بێت.</li>
+                  <li>ئەگەر بە هەڵە یان لە ئاستێکی هەڵەدا کڕینت کردووە، تکایە لە ماوەی ٧ ڕۆژدا پەیوەندیمان پێوە بکە.</li>
+                  <li>داواکاری بۆ گەڕاندنەوەی پارە لەسەر بنەمای حاڵەت بە حاڵەت لێکدەدرێتەوە.</li>
+                  <li>ئەگەر گەڕاندنەوەی پارەکە پەسەند کرا، لەڕێگەی هەمان شێوازی پارەدانی سەرەتایی جێبەجێ دەکرێت.</li>
+                  <li>سوودەکانی نیشانە و پەرکەکان لادەبرێن ئەگەر پارەکە بگەڕێنرێتەوە.</li>
+                  <li>بۆ کێشە تەکنیکیەکانی پەیوەست بە پارەدان یان ئەگەر نیشانەکەت بە دروستی دەرناکەوێت، تکایە دەستبەجێ پەیوەندیمان پێوە بکە لەگەڵ وردەکاریەکانی پەیوەندیدار.</li>
+                </ul>
+                <p className="mt-2">بۆ هەر پرسیارێک سەبارەت بە پەرکەکان یان سیاسەتی گەڕاندنەوەی پارەکەمان، تکایە پەیوەندیمان پێوە بکە لە <a href="https://t.me/RtxMumin" className="text-indigo-400 hover:underline">تێلیگرام</a>.</p>
               </section>
               
               <section>

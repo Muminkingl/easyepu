@@ -10,7 +10,8 @@ import {
   HomeIcon, 
   BellIcon, 
   BookOpenIcon,
-  PresentationChartBarIcon
+  PresentationChartBarIcon,
+  HeartIcon
 } from '@heroicons/react/24/outline';
 import { useTranslations } from '@/lib/i18n';
 
@@ -57,6 +58,12 @@ const getDefaultNavigation = (): NavItem[] => [
     href: '/dashboard/presentation-group', 
     icon: PresentationChartBarIcon,
     descriptionKey: 'sidebar.presentationGroupDesc'
+  },
+  { 
+    nameKey: 'sidebar.perks', 
+    href: '/dashboard/support-us', 
+    icon: HeartIcon,
+    descriptionKey: 'sidebar.perksDesc'
   }
 ];
 

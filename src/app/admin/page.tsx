@@ -57,12 +57,20 @@ export default function AdminDashboard() {
     }
     
     // If user email doesn't end with @epu.edu.iq, redirect to unauthorized
+    // TEMPORARILY DISABLED FOR TESTING
+    /*
     if (isLoaded && isSignedIn && user?.primaryEmailAddress?.emailAddress) {
       if (!user.primaryEmailAddress.emailAddress.endsWith('@epu.edu.iq')) {
         router.push('/unauthorized');
         return;
       }
       
+      setLoading(false);
+    }
+    */
+    
+    // TEMPORARY CODE FOR TESTING - Allow all email domains
+    if (isLoaded && isSignedIn) {
       setLoading(false);
     }
   }, [isLoaded, isSignedIn, user, router, isRoleLoading, isAdmin]);
