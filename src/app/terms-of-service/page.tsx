@@ -62,10 +62,12 @@ export default function TermsOfService() {
                 <h2 className="text-xl font-semibold mb-4">Refund Policy</h2>
                 <p>The following refund policy applies to all perks purchases made on the Easy EPU platform:</p>
                 <ul className="list-disc list-inside ml-4 mt-2">
-                  <li>All perks purchases that unlock special badges (Bronze, Gold, and Diamond) are non-refundable unless required by law.</li>
-                  <li>If you have made a purchase by mistake or in the wrong tier, please contact us within 7 days of the transaction.</li>
-                  <li>Requests for refunds will be considered on a case-by-case basis.</li>
-                  <li>If a refund is approved, it will be processed through the original payment method used.</li>
+                  <li>All perks purchases that unlock special badges (Bronze, Gold, and Diamond) are considered Digital Content.</li>
+                  <li><strong>WHERE A PRODUCT IS DIGITAL CONTENT WHICH IS IMMEDIATELY MADE AVAILABLE, BY DOWNLOADING OR OTHERWISE ACQUIRING THE PRODUCT, YOU CONSENT TO IMMEDIATE PERFORMANCE OF THIS AGREEMENT AND ACKNOWLEDGE THAT YOU WILL LOSE YOUR RIGHT OF WITHDRAWAL FROM THIS AGREEMENT ONCE THE DOWNLOAD OR APPLICABLE TRANSMISSION OF THE DIGITAL CONTENT HAS BEGUN.</strong></li>
+                  <li>As per Paddle's terms (our payment processor and Merchant of Record): "Refunds are provided at the sole discretion of Paddle and on a case-by-case basis and may be refused."</li>
+                  <li>Paddle will refuse a refund request if they find evidence of fraud, refund abuse, or other manipulative behavior that entitles them to counterclaim the refund.</li>
+                  <li>If you have made a purchase by mistake or in the wrong tier, please contact us within 14 days of the transaction.</li>
+                  <li>If a refund is approved by Paddle, it will be processed through the original payment method used.</li>
                   <li>Badge and perks benefits will be removed if a refund is processed.</li>
                   <li>For technical issues related to payments or if your badge is not showing properly, please contact us immediately with relevant details.</li>
                 </ul>
@@ -125,10 +127,12 @@ export default function TermsOfService() {
                 <h2 className="text-xl font-semibold mb-4">سیاسەتی گەڕاندنەوەی پارە</h2>
                 <p>سیاسەتی گەڕاندنەوەی پارەی خوارەوە بۆ هەموو کڕینی پەرکەکان لە پلاتفۆرمی ئیزی ئی پی یو جێبەجێ دەکرێت:</p>
                 <ul className="list-disc list-inside mr-4 mt-2">
-                  <li>هەموو کڕینی پەرکەکان کە نیشانەی تایبەت دەکەنەوە (برۆنز، زێڕ، و ئەڵماس) ناگەڕێنرێنەوە مەگەر بە پێی یاسا پێویست بێت.</li>
+                  <li>هەموو کڕینی پەرکەکان کە نیشانەی تایبەت دەکەنەوە (برۆنز، زێڕ، و ئەڵماس) بە ناوەڕۆکی دیجیتاڵ دادەنرێن.</li>
+                  <li><strong>کاتێک بەرهەمێک ناوەڕۆکی دیجیتاڵە کە دەستبەجێ بەردەست دەکرێت، بە داگرتن یان بەدەستهێنانی بەرهەمەکە بە شێوەیەکی تر، تۆ ڕەزامەندی دەردەبڕیت بۆ جێبەجێکردنی دەستبەجێی ئەم ڕێککەوتننامەیە و دان بەوەدا دەنێیت کە مافی کشانەوەت لەم ڕێککەوتننامەیە لەدەست دەدەیت کاتێک داگرتنەکە یان گواستنەوەی پەیوەندیداری ناوەڕۆکی دیجیتاڵ دەست پێ دەکات.</strong></li>
+                  <li>بە پێی مەرجەکانی Paddle (پرۆسیسۆری پارەدانەکەمان و بازرگانی تۆماری): "گەڕاندنەوەی پارە بە خواستی تەنهای Paddle دەبێت و لەسەر بنەمای حاڵەت بە حاڵەت و لەوانەیە ڕەت بکرێتەوە."</li>
+                  <li>Paddle داواکاریی گەڕاندنەوەی پارە ڕەت دەکاتەوە ئەگەر بەڵگەی فێڵکردن، خراپ بەکارهێنانی گەڕاندنەوەی پارە، یان ڕەفتاری دەستکاری کراوی تر بدۆزێتەوە کە بواریان دەدات بەرهەڵستی داواکاری گەڕاندنەوەی پارەکە بکەن.</li>
                   <li>ئەگەر بە هەڵە یان لە ئاستێکی هەڵەدا کڕینت کردووە، تکایە لە ماوەی ٧ ڕۆژدا پەیوەندیمان پێوە بکە.</li>
-                  <li>داواکاری بۆ گەڕاندنەوەی پارە لەسەر بنەمای حاڵەت بە حاڵەت لێکدەدرێتەوە.</li>
-                  <li>ئەگەر گەڕاندنەوەی پارەکە پەسەند کرا، لەڕێگەی هەمان شێوازی پارەدانی سەرەتایی جێبەجێ دەکرێت.</li>
+                  <li>ئەگەر گەڕاندنەوەی پارەکە لەلایەن Paddle پەسەند کرا، لەڕێگەی هەمان شێوازی پارەدانی سەرەتایی جێبەجێ دەکرێت.</li>
                   <li>سوودەکانی نیشانە و پەرکەکان لادەبرێن ئەگەر پارەکە بگەڕێنرێتەوە.</li>
                   <li>بۆ کێشە تەکنیکیەکانی پەیوەست بە پارەدان یان ئەگەر نیشانەکەت بە دروستی دەرناکەوێت، تکایە دەستبەجێ پەیوەندیمان پێوە بکە لەگەڵ وردەکاریەکانی پەیوەندیدار.</li>
                 </ul>
