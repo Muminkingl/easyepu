@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 // Define public routes that don't require authentication
-const isPublicRoute = createRouteMatcher(["/", "/unauthorized", "/sign-in", "/sign-up", "/privacy-policy", "/terms-of-service", "/cookie-policy", "/test-login"]);
+const isPublicRoute = createRouteMatcher(["/", "/unauthorized", "/sign-in", "/sign-up", "/privacy-policy", "/terms-of-service", "/cookie-policy"]);
 // Define admin routes that require admin role
 const isAdminRoute = createRouteMatcher(["/admin(.*)"]); 
 
@@ -43,29 +43,6 @@ function isDashboardRoute(req: Request): boolean {
 export default clerkMiddleware(async (auth, req) => {
   // Get the original response
   let response = NextResponse.next();
-
-  // Check for test auth cookie - REMOVE IN PRODUCTION
-  const hasTestAuth = req.cookies.get('test_auth')?.value === 'true';
-
-  // TESTING ONLY - Skip all security checks if test auth is present - REMOVE IN PRODUCTION
-  if (hasTestAuth) {
-    // Set test user headers for API routes if needed
-    if (isApiRoute(req) && isCourseApiRoute(req)) {
-      response.headers.set('X-User-ID', 'test-user-id');
-    }
-    
-    // Set permissive Content Security Policy and other headers
-    response.headers.set(
-      'Content-Security-Policy',
-      "default-src * 'unsafe-inline' 'unsafe-eval'; script-src * 'unsafe-inline' 'unsafe-eval'; connect-src * 'unsafe-inline'; img-src * data: blob:; frame-src * https://*.paddle.com https://sandbox-buy.paddle.com https://buy.paddle.com https://checkout.paddle.com https://sandbox-checkout.paddle.com;"
-    );
-    response.headers.delete('Content-Security-Policy-Report-Only');
-    response.headers.set('X-XSS-Protection', '0');
-    response.headers.set('X-Content-Type-Options', 'nosniff');
-    response.headers.set('Referrer-Policy', 'no-referrer-when-downgrade');
-    
-    return response;
-  }
 
   // Implement rate limiting for API routes
   if (isApiRoute(req)) {
@@ -155,14 +132,11 @@ export default clerkMiddleware(async (auth, req) => {
     }
     
     // If authenticated but doesn't have EPU email domain, redirect to unauthorized
-    // TEMPORARILY DISABLED FOR TESTING
-    /*
     const userEmail = sessionClaims?.email as string;
     if (userEmail && !userEmail.endsWith('@epu.edu.iq')) {
       const unauthorizedUrl = new URL('/unauthorized', req.url);
       return NextResponse.redirect(unauthorizedUrl);
     }
-    */
 
     // For admin routes, check if user has admin role
     if (isAdminRoute(req)) {

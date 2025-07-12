@@ -22,15 +22,7 @@ export default function Dashboard() {
   const [isLoadingCourses, setIsLoadingCourses] = useState(true);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [semesterRequired, setSemesterRequired] = useState(false);
-  const [hasTestAuth, setHasTestAuth] = useState(false);
   const { t, dir } = useTranslations();
-  
-  // Check for test authentication cookie - REMOVE IN PRODUCTION
-  useEffect(() => {
-    const cookies = document.cookie.split(';');
-    const testAuthCookie = cookies.find(cookie => cookie.trim().startsWith('test_auth='));
-    setHasTestAuth(testAuthCookie !== undefined && testAuthCookie.includes('true'));
-  }, []);
   
   // Check environment variables on component mount
   useEffect(() => {
@@ -38,20 +30,13 @@ export default function Dashboard() {
     setEnvError(!envCheck);
   }, []);
   
-  useEffect(() => {
-    // TEMPORARY FOR TESTING - Skip all redirects if test auth is active
-    if (hasTestAuth) {
-      setLoading(false);
-      return;
-    }
-    
+  useEffect(() => {    
     // If user is not logged in, redirect to home
     if (isLoaded && !isSignedIn) {
       router.push('/');
       return;
     }
     
-    // TEMPORARY CODE FOR TESTING - Allow all email domains
     if (isLoaded && isSignedIn && user?.primaryEmailAddress?.emailAddress) {
       // Only check semester if we have real user data
       if (!isUserDataLoading && userData && !userData.semester_selected) {
@@ -65,18 +50,11 @@ export default function Dashboard() {
       
       setLoading(false);
     }
-  }, [isLoaded, isSignedIn, user, router, pathname, userData, isUserDataLoading, hasTestAuth]);
+  }, [isLoaded, isSignedIn, user, router, pathname, userData, isUserDataLoading]);
 
   // Fetch course count for stats
   useEffect(() => {
     const fetchCoursesCount = async () => {
-      // Don't fetch courses for test authentication - REMOVE IN PRODUCTION
-      if (hasTestAuth) {
-        setIsLoadingCourses(false);
-        setCoursesCount(3); // Sample count for test users
-        return;
-      }
-      
       if (user) {
         try {
           setIsLoadingCourses(true);
@@ -97,10 +75,10 @@ export default function Dashboard() {
       }
     };
     
-    if ((!isUserDataLoading && userData) || hasTestAuth) {
+    if (!isUserDataLoading && userData) {
       fetchCoursesCount();
     }
-  }, [user, userData, isUserDataLoading, hasTestAuth]);
+  }, [user, userData, isUserDataLoading]);
 
   // Listen for sidebar toggle events
   useEffect(() => {
@@ -115,7 +93,7 @@ export default function Dashboard() {
     };
   }, []);
 
-  if (loading || (!hasTestAuth && (!isLoaded || !isSignedIn || isUserDataLoading))) {
+  if (loading || (!isLoaded || !isSignedIn || isUserDataLoading)) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="text-center">
@@ -127,9 +105,7 @@ export default function Dashboard() {
   }
 
   // Get display name - prioritize Clerk real name, then fall back to username, then email
-  const displayName = hasTestAuth ? "Test User" : (
-    user.fullName || user.firstName || userData?.username || user.primaryEmailAddress?.emailAddress.split('@')[0]
-  );
+  const displayName = user.fullName || user.firstName || userData?.username || user.primaryEmailAddress?.emailAddress.split('@')[0];
 
   // Dynamic data for stats display
   const stats = [
@@ -144,25 +120,6 @@ export default function Dashboard() {
 
   return (
     <main className={`transition-all duration-300 ${sidebarCollapsed ? 'ml-16 md:ml-16' : 'ml-16 md:ml-64'} p-4 md:p-6`}>
-      {/* Test auth banner - REMOVE IN PRODUCTION */}
-      {hasTestAuth && (
-        <div className="bg-red-900/70 text-white p-3 rounded-lg mb-4 flex items-center justify-between">
-          <div className="flex items-center">
-            <span className="font-bold">⚠️ TEST MODE ACTIVE</span>
-            <span className="ml-2 text-sm">Using test authentication (test@test.com)</span>
-          </div>
-          <button 
-            onClick={() => {
-              document.cookie = 'test_auth=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;';
-              router.push('/test-login');
-            }}
-            className="bg-red-700 hover:bg-red-600 px-3 py-1 rounded text-sm"
-          >
-            Exit Test Mode
-          </button>
-        </div>
-      )}
-      
       <div className="max-w-7xl mx-auto">
       {/* Alert messages */}
       {envError && (
@@ -173,7 +130,7 @@ export default function Dashboard() {
         </div>
       )}
       
-      {userDataError && !hasTestAuth && (
+      {userDataError && (
           <div className={`bg-yellow-900/50 ${dir === 'rtl' ? 'border-r-4' : 'border-l-4'} border-yellow-500 text-yellow-200 p-4 mb-6 rounded shadow-sm backdrop-blur-sm`} role="alert">
           <p className="font-bold">{t('dashboard.alerts.dbConnectionIssue')}</p>
           <p>{t('dashboard.alerts.defaultRole')}</p>
@@ -181,7 +138,7 @@ export default function Dashboard() {
       )}
       
       {/* Semester warning - only show for non-admins */}
-      {semesterRequired && !isAdmin && !hasTestAuth && (
+      {semesterRequired && !isAdmin && (
         <div className={`bg-indigo-900/50 ${dir === 'rtl' ? 'border-r-4' : 'border-l-4'} border-indigo-500 text-indigo-200 p-4 mb-6 rounded shadow-sm backdrop-blur-sm animate-pulse`} role="alert">
           <p className="font-bold">{t('profile.semesterInfo.locked')}</p>
           <p>{t('profile.semesterInfo.requiredMessage')}</p>
@@ -203,18 +160,18 @@ export default function Dashboard() {
               {t('dashboard.welcomeBack')}, <span className="font-semibold">{displayName}</span>!
             </p>
               <p className="text-indigo-300 text-sm mt-1">
-              {hasTestAuth ? "test@test.com" : user.primaryEmailAddress?.emailAddress}
+              {user.primaryEmailAddress?.emailAddress}
             </p>
           </div>
           
           <div className="flex flex-col sm:flex-row gap-2">
-            {(user?.fullName || hasTestAuth) && (
+            {(user?.fullName) && (
                 <span className="bg-indigo-800/50 text-indigo-200 text-xs font-semibold px-3 py-1.5 rounded-full flex items-center justify-center backdrop-blur-sm">
-                {hasTestAuth ? "Test User" : user.fullName}
+                {user.fullName}
               </span>
             )}
             
-            {(isAdmin || hasTestAuth) && (
+            {(isAdmin) && (
               <a 
                 href="/admin" 
                   className="bg-purple-800/50 hover:bg-purple-700/50 text-purple-200 text-sm font-medium px-4 py-2 rounded-md transition-colors flex items-center justify-center backdrop-blur-sm"

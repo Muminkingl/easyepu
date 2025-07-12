@@ -77,17 +77,7 @@ export default function Sidebar() {
   const { userData } = useUserData();
   const { user } = useUser();
   const [navigation, setNavigation] = useState(getDefaultNavigation());
-  const [hasTestAuth, setHasTestAuth] = useState(false);
   const { t, dir } = useTranslations();
-
-  // Check for test authentication cookie - REMOVE IN PRODUCTION
-  useEffect(() => {
-    if (typeof document !== 'undefined') {
-      const cookies = document.cookie.split(';');
-      const testAuthCookie = cookies.find(cookie => cookie.trim().startsWith('test_auth='));
-      setHasTestAuth(testAuthCookie !== undefined && testAuthCookie.includes('true'));
-    }
-  }, []);
 
   // Check if current path matches navigation item
   const isActivePath = (itemPath: string, exact = false) => {
@@ -163,36 +153,6 @@ export default function Sidebar() {
 
   // Render user profile section in the bottom of the sidebar
   const renderUserProfile = () => {
-    // Check for test authentication - REMOVE IN PRODUCTION
-    if (hasTestAuth) {
-      const displayName = "Test User";
-      const profileInitial = "T";
-      
-      if (collapsed && !isOpen) {
-        return (
-          <div className="relative">
-            <div className="h-8 w-8 rounded-full border-2 border-red-300 bg-red-600 flex items-center justify-center">
-              <span className="text-white font-medium text-sm">{profileInitial}</span>
-            </div>
-            <span className="absolute bottom-0 right-0 block h-2 w-2 rounded-full bg-yellow-400 ring-1 ring-white"></span>
-          </div>
-        );
-      }
-      
-      return (
-        <div className="flex items-center">
-          <div className="h-10 w-10 rounded-full border-2 border-red-300 bg-red-600 flex items-center justify-center">
-            <span className="text-white font-medium text-sm">{profileInitial}</span>
-          </div>
-          <div className="ml-3">
-            <p className="text-sm font-medium text-white">{displayName}</p>
-            <p className="text-xs text-red-300">TEST MODE</p>
-          </div>
-        </div>
-      );
-    }
-    
-    // Normal user profile (non-test)
     // Get display name - prioritize Clerk real name, then fall back to username, then email
     const displayName = user?.fullName || user?.firstName || userData?.username || user?.primaryEmailAddress?.emailAddress?.split('@')[0] || '';
     
