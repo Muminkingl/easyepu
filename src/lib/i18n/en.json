@@ -1,0 +1,547 @@
+{
+  "header": {
+    "title": "EASY EPU",
+    "features": "Features",
+    "faq": "FAQ",
+    "about": "About",
+    "contact": "Contact",
+    "dashboard": "Dashboard",
+    "login": "Login"
+  },
+  "hero": {
+    "title": {
+      "line1": "Your University Life",
+      "line2": "Made Effortless"
+    },
+    "description": "A student-centered platform that simplifies everything from course management to university announcements - all in one beautiful interface.",
+    "getStarted": "Get Started Now",
+    "goToDashboard": "Go to Dashboard",
+    "learnMore": "Learn More"
+  },
+  "stats": {
+    "satisfactionRate": "Satisfaction Rate",
+    "activeStudents": "Active Students",
+    "coursesManaged": "Courses Managed",
+    "supportAccess": "Support Access"
+  },
+  "features": {
+    "sectionTitle": "Everything You Need",
+    "sectionDescription": "Designed to make your university experience seamless and stress-free",
+    "items": {
+      "announcements": {
+        "title": "Real-time Announcements",
+        "description": "Get instant notifications about important university updates and never miss critical information."
+      },
+      "courseMaterials": {
+        "title": "Course Materials",
+        "description": "Access all your course materials, lectures, and resources in one organized place."
+      },
+      "security": {
+        "title": "Enhanced Security",
+        "description": "Your data is protected with industry-leading security measures. Every function and action is traced and monitored by administrators, ensuring complete privacy and accountability."
+      },
+      "activityLogs": {
+        "title": "User Activity Logs",
+        "description": "All your actions are securely logged and timestamped, providing complete transparency and accountability throughout the platform."
+      },
+      "userFriendly": {
+        "title": "Clean User Interface",
+        "description": "Enjoy a beautiful, intuitive design that makes navigation effortless. Our minimalist approach ensures you can focus on what matters."
+      },
+      "aiOrganization": {
+        "title": "AI-Powered Organization",
+        "description": "Our intelligent system organizes your academic data, making it easier to find what you need when you need it."
+      }
+    }
+  },
+  "faq": {
+    "sectionTitle": "Frequently Asked Questions",
+    "sectionDescription": "Everything you need to know about Easy EPU",
+    "items": [
+      {
+        "question": "Who can use Easy EPU?",
+        "answer": "Easy EPU is exclusively available for students and staff with an official EPU email address."
+      },
+      {
+        "question": "Is my data secure?",
+        "answer": "Absolutely! We use industry-standard encryption to ensure your academic data remains private and secure."
+      },
+      {
+        "question": "Do I need to download anything?",
+        "answer": "No downloads required. Easy EPU is a web-based platform that works on any device with an internet connection."
+      },
+      {
+        "question": "How do I get support if I have issues?",
+        "answer": "Our support team is available 24/7. Just click on the help icon in the bottom right corner of your dashboard."
+      }
+    ]
+  },
+  "cta": {
+    "title": "Ready to Transform Your University Experience?",
+    "description": "Join thousands of students who are already enjoying a more organized and stress-free academic life.",
+    "signUp": "Sign Up with EPU Email"
+  },
+  "footer": {
+    "copyright": "© 2023-2024 Easy EPU. All rights reserved.",
+    "description": "Making student life simpler and more organized than the original EPU system.",
+    "links": {
+      "privacyPolicy": "Privacy Policy",
+      "terms": "Terms of Service",
+      "cookiePolicy": "Cookie Policy"
+    },
+    "madeWith": "Made with"
+  },
+  "common": {
+    "loading": "Loading...",
+    "backToHome": "Back to Home",
+    "save": "Save",
+    "saving": "Saving...",
+    "errorTitle": "Error",
+    "cancel": "Cancel",
+    "continue": "Continue",
+    "processing": "Processing..."
+  },
+  "dashboard": {
+    "loading": "Loading your dashboard...",
+    "studentDashboard": "Student Dashboard",
+    "welcomeBack": "Welcome back",
+    "adminDashboard": "Admin Dashboard",
+    "viewProfile": "View Profile",
+    "currentCourses": "Current Courses",
+    "unreadAnnouncements": "Unread Announcements",
+    "latestAnnouncements": "Latest Announcements",
+    "viewDetails": "View details",
+    "viewAll": "View All",
+    "quickActions": "Quick Actions",
+    "viewCourses": "View Courses",
+    "accessCourses": "Access your current courses",
+    "announcements": "Announcements",
+    "viewAllAnnouncements": "View all university announcements",
+    "needHelp": "Need Help?",
+    "contactSupport": "Contact support or view our documentation for assistance.",
+    "supportButton": "Contact Support",
+    "alerts": {
+      "envVariableIssue": "Environment Variable Issue",
+      "supabaseMissing": "Supabase environment variables are missing. User roles will default to student.",
+      "checkEnv": "Please check your .env.local file and ensure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are set.",
+      "dbConnectionIssue": "Database Connection Issue",
+      "defaultRole": "There was a problem connecting to the user database. Continuing with default student role."
+    }
+  },
+  "announcements": {
+    "title": "Announcements",
+    "noAnnouncements": "No Announcements",
+    "noAnnouncementsMessage": "There are no new announcements at this time. Check back later for updates from your instructors and university administration.",
+    "refresh": "Refresh",
+    "failedToLoad": "Failed to load announcements",
+    "tryAgain": "Try Again",
+    "dismiss": "Dismiss announcement",
+    "viewPoll": "View poll",
+    "readMore": "Read more",
+    "searchAnnouncements": "Search announcements...",
+    "noMatchingAnnouncements": "No matching announcements",
+    "noMatchingMessage": "We couldn't find any announcements matching \"{query}\".",
+    "clearSearch": "Clear Search",
+    "important": "Important",
+    "createdBy": "Created by",
+    "createdAt": "Created at",
+    "back": "Back to Announcements",
+    "announcement": "Announcement",
+    "notFound": "Announcement not found",
+    "notFoundMessage": "Unable to load the announcement. It may have been deleted or you don't have permission to view it.",
+    "return": "Return to Announcements",
+    "loading": "Loading announcement...",
+    "poll": "Poll",
+    "initializing": "Initializing...",
+    "loadingContent": "Loading content...",
+    "loadingAnnouncementData": "Loading announcement data...",
+    "loadingPollData": "Loading poll data...",
+    "retryAttempt": "Retry attempt",
+    "returnToList": "Return to announcements list",
+    "announcementId": "Announcement ID",
+    "backToList": "Back to announcements",
+    "targetAudience": {
+      "all": "All Users",
+      "students": "Students Only",
+      "faculty": "Faculty Only"
+    }
+  },
+  "poll": {
+    "completeProfileRequired": "You must complete your profile before voting",
+    "profileRequiredMessage": "You must set your gender and class/group before you can vote in polls.",
+    "completeProfileMessage": "Please set your gender and group class in your profile before participating in polls.",
+    "usernameRequired": "Username required for voting",
+    "usernameRequiredMessage": "You must set a username in your profile before participating in polls. This helps identify your votes to other participants.",
+    "updateProfile": "Update Profile",
+    "errorSubmitting": "Failed to submit your vote. Please try again.",
+    "errorUpdating": "Failed to update your vote. Please try again.",
+    "inactive": "This poll is no longer active",
+    "submitVote": "Submit Vote",
+    "submitting": "Submitting...",
+    "cancel": "Cancel",
+    "updateVote": "Update Vote",
+    "updating": "Updating...",
+    "changeVote": "Change vote",
+    "confirm": "Confirm",
+    "vote": "Vote",
+    "votes": "votes",
+    "yourVote": "Your vote",
+    "noQuestionAvailable": "No question available",
+    "ended": "Ended {date}",
+    "ends": "Ends {date}",
+    "noEndDate": "No end date",
+    "totalVotes": "Total votes: {count}",
+    "errorDisplaying": "There was an error displaying the poll",
+    "gender": {
+      "men": "Men: {count}",
+      "women": "Women: {count}",
+      "other": "Other/Not specified: {count}"
+    }
+  },
+  "sidebar": {
+    "mainMenu": "Main Menu",
+    "dashboard": "Dashboard",
+    "dashboardDesc": "Overview of your academic activities",
+    "profile": "Profile",
+    "profileDesc": "Manage your personal information",
+    "announcements": "Announcements",
+    "announcementsDesc": "Check important notifications",
+    "courses": "Courses",
+    "coursesDesc": "Access your enrolled courses",
+    "presentationGroup": "Presentation Group",
+    "presentationGroupDesc": "Manage your presentation groups",
+    "perks": "Perks",
+    "perksDesc": "Access special features and benefits",
+    "toggleMenu": "Toggle menu",
+    "toggleSidebar": "Toggle sidebar"
+  },
+  "profile": {
+    "loading": "Loading your profile...",
+    "loadingDesc": "Please wait while we retrieve your information",
+    "alerts": {
+      "envVariableIssue": "Environment Variable Issue",
+      "envVariableDesc": "Supabase environment variables are missing. Profile features may be limited.",
+      "dbConnectionIssue": "Database Connection Issue",
+      "dbConnectionDesc": "There was a problem connecting to the user database. Profile features may be limited."
+    },
+    "title": "Profile Information",
+    "description": "Your personal and academic information",
+    "fullName": "Full Name",
+    "email": "Email",
+    "verified": "Verified",
+    "accountType": "Account Type",
+    "admin": "Admin",
+    "department": "Department",
+    "phoneNumber": "Phone Number",
+    "gender": "Gender",
+    "groupClass": "Group Class",
+    "note": "Note",
+    "noteDesc": "Your profile information is synchronized with your EPU account. If you need to update your personal information, please contact the university administration.",
+    "contactInfo": {
+      "title": "Contact Information",
+      "description": "Update your contact information",
+      "phoneNumber": "Phone Number",
+      "updatePhoneNumber": "Update Phone Number",
+      "phoneNumberFormat": "Format: 07XXXXXXXXX (Iraqi mobile number)",
+      "phoneNumberError": "Phone number must be in the format 07XXXXXXXXX (11 digits starting with 07)",
+      "phoneNumberTooShort": "Phone number is too short",
+      "phoneNumberTooLong": "Phone number is too long",
+      "genericError": "An error occurred while updating your number. Please try again",
+      "notAuthenticated": "Please login to update your information",
+      "updateFailed": "Failed to update phone number on the server",
+      "updateLocalFailed": "Phone number updated on server but failed to update locally",
+      "adminWarning": "For administrative purposes only",
+      "adminNote": "Your phone number is used by administrators for urgent communication only and is never shared with third parties.",
+      "updating": "Updating...",
+      "updatedSuccessfully": "Updated Successfully",
+      "success": "Phone number updated successfully"
+    },
+    "genderInfo": {
+      "title": "Gender Information",
+      "description": "Set your gender identification",
+      "updateFailed": "Failed to update gender on the server",
+      "updateLocalFailed": "Gender updated on server but failed to update locally"
+    },
+    "groupInfo": {
+      "title": "Group Selection",
+      "description": "Set your class group (A1 or A2)"
+    },
+    "usernameInfo": {
+      "title": "Username Settings",
+      "description": "Set your username (can only be set once)"
+    },
+    "semester": "Semester",
+    "semesterOption": "Semester {num}",
+    "selectSemester": "Select a semester",
+    "semesterInfo": {
+      "title": "Semester Selection",
+      "heading": "Semester Information",
+      "headingDescription": "Select your current semester to see relevant content",
+      "description": "Please select your current semester to see content specific to your academic progress",
+      "updateFailed": "Failed to update semester on the server",
+      "updateLocalFailed": "Semester updated on server but failed to update locally",
+      "requiredMessage": "You must select your semester before accessing this feature",
+      "locked": "Feature Locked",
+      "lockedMessage": "This feature is locked until you select your semester",
+      "selectSemesterFirst": "Please select a semester first",
+      "selectSemesterPlaceholder": "Select semester..."
+    }
+  },
+  "cookiePolicy": {
+    "title": "Cookie Policy",
+    "lastUpdated": "Last Updated",
+    "introduction": {
+      "title": "Introduction",
+      "content": "This Cookie Policy explains how Easy EPU uses cookies and similar technologies to recognize you when you visit our platform. It explains what these technologies are and why we use them, as well as your rights to control our use of them."
+    },
+    "whatAreCookies": {
+      "title": "What Are Cookies?",
+      "content1": "Cookies are small data files that are placed on your computer or mobile device when you visit a website. Cookies are widely used by website owners to make their websites work, or to work more efficiently, as well as to provide reporting information.",
+      "content2": "Cookies set by Easy EPU are called \"first-party cookies\". Cookies set by parties other than the website owner are called \"third-party cookies\". Third-party cookies enable third-party features or functionality to be provided on or through the website (e.g., advertising, interactive content and analytics)."
+    },
+    "whyUseCookies": {
+      "title": "Why Do We Use Cookies?",
+      "intro": "We use first-party and third-party cookies for several reasons:",
+      "types": {
+        "essential": "Essential Cookies: These cookies are necessary for the website to function properly and cannot be switched off in our systems.",
+        "performance": "Performance Cookies: These cookies allow us to count visits and traffic sources so we can measure and improve the performance of our site.",
+        "functional": "Functional Cookies: These cookies enable the website to provide enhanced functionality and personalization.",
+        "analytics": "Analytics Cookies: These cookies help us understand how visitors interact with our website by collecting and reporting information anonymously."
+      }
+    },
+    "cookiesWeUse": {
+      "title": "Cookies We Use",
+      "essential": {
+        "title": "Essential Cookies",
+        "name": "Cookie Name",
+        "purpose": "Purpose",
+        "duration": "Duration",
+        "authSession": {
+          "name": "auth_session",
+          "purpose": "Authentication and session management",
+          "duration": "Session"
+        }
+      },
+      "performance": {
+        "title": "Performance Cookies",
+        "ga": {
+          "name": "_ga",
+          "purpose": "Google Analytics - Used to distinguish users",
+          "duration": "2 years"
+        },
+        "gid": {
+          "name": "_gid",
+          "purpose": "Google Analytics - Used to distinguish users",
+          "duration": "24 hours"
+        }
+      },
+      "functional": {
+        "title": "Functional Cookies",
+        "userPreferences": {
+          "name": "user_preferences",
+          "purpose": "Stores user preferences like theme selection and UI settings",
+          "duration": "1 year"
+        }
+      }
+    },
+    "control": {
+      "title": "How to Control Cookies",
+      "content1": "You can control and manage cookies in various ways. Please keep in mind that removing or blocking cookies can negatively impact your user experience and parts of our website may no longer be fully accessible.",
+      "content2": "Most browsers automatically accept cookies, but you can choose to accept or decline cookies through your browser controls. For more information on how to manage cookies, please visit your browser's help function."
+    },
+    "changes": {
+      "title": "Changes to This Cookie Policy",
+      "content": "We may update our Cookie Policy from time to time. We will notify you of any changes by posting the new Cookie Policy on this page and updating the \"Last Updated\" date."
+    },
+    "contact": {
+      "title": "Contact Us",
+      "content": "If you have any questions about our Cookie Policy, please contact us at:",
+      "email": "Email",
+      "telegram": "Telegram"
+    }
+  },
+  "coursesPage": {
+    "title": "Courses",
+    "subtitle": "Browse all available courses or view your saved items",
+    "semesterFilter": "Showing courses for Semester",
+    "search": "Search courses by title or description",
+    "filters": "Filters",
+    "refresh": "Refresh",
+    "loading": "Loading courses...",
+    "noCourses": "No courses found",
+    "noCoursesMessage": "There are no courses available at this time. Please check back later.",
+    "error": "Failed to load courses",
+    "tryAgain": "Try again",
+    "save": "Save course",
+    "unsave": "Unsave course",
+    "view": "View course details",
+    "instructor": "Instructor",
+    "categories": {
+      "all": "All Courses",
+      "saved": "Saved Courses"
+    }
+  },
+  "courseDetail": {
+    "backToCourses": "Back to Courses",
+    "saved": "Saved",
+    "instructor": "Instructor",
+    "noInstructorAssigned": "No instructor assigned",
+    "courseContent": "Course Content",
+    "resources": "Resources",
+    "noResources": "No resources available yet",
+    "noContentYet": "No Content Yet",
+    "noContentMessage": "This course doesn't have any content at the moment. Check back soon for updates",
+    "loading": "Loading Course",
+    "loadingDescription": "Please wait while we prepare your learning materials...",
+    "error": "Something went wrong",
+    "returnToCourses": "Return to Courses"
+  },
+  "presentationGroupPage": {
+    "uploaded✓": "uploaded✓",
+    "uploaded ✓": "uploaded ✓",
+    "uploaded": "uploaded",
+    "title": "Presentation Groups",
+    "subtitle": "Join or create presentation groups for your courses",
+    "refresh": "Refresh",
+    "availableSections": "Available Sections",
+    "noSectionsAvailable": "No presentation sections available",
+    "checkBackLater": "Check back later or contact your instructor",
+    "maxMembers": "Max {count} members",
+    "joined": "Joined",
+    "selectSection": "Select a Presentation Section",
+    "selectSectionDesc": "Choose a section from the list on the left to view details and join a group",
+    "maxMembersPerGroup": "Maximum {count} members per group",
+    "yourGroup": "You're already in a group for this section",
+    "editMembers": "Edit Members",
+    "editDetails": "Edit Details",
+    "editNotes": "Edit Notes",
+    "editGroupDetails": "Edit Group Details",
+    "autoGenerated": "Auto-generated",
+    "groupNameCannotBeChanged": "Group names are automatically generated and cannot be changed",
+    "groupName": "Group Name",
+    "groupNameOptional": "Group Name (Optional)",
+    "notes": "Notes",
+    "notesOptional": "Notes (Optional)",
+    "notesPlaceholder": "Any additional information about your group...",
+    "saving": "Saving...",
+    "saveChanges": "Save Changes",
+    "cancel": "Cancel",
+    "editGroupMembers": "Edit Group Members",
+    "youCreator": "You (Creator)",
+    "memberName": "Member name",
+    "emailOptional": "Email (optional)",
+    "addMember": "Add Member",
+    "cancelEditing": "Cancel",
+    "createGroup": "Create Group",
+    "hideJoinForm": "Hide Join Form",
+    "createNewGroup": "Create New Group",
+    "teamNamePlaceholder": "e.g., Team Awesome",
+    "groupMembers": "Group Members",
+    "membersCount": "{current}/{max} members (including you)",
+    "addAnotherMember": "Add Another Member",
+    "creatingGroup": "Creating Group...",
+    "existingGroups": "Existing Groups in {section}",
+    "createdAt": "Created {date}",
+    "members": "Members:",
+    "noMembers": "No members yet",
+    "creator": "Creator",
+    "profileRequired": "Complete your profile",
+    "profileRequiredMessage": "You must set your gender and group class in your profile before creating a group.",
+    "updateProfile": "Update Profile",
+    "topic": "Presentation Topic",
+    "topicPlaceholder": "Enter your presentation topic...",
+    "topicRequired": "Topic (Required)",
+    "addTopic": "Add Topic",
+    "editTopic": "Edit Topic",
+    "saveTopic": "Save Topic",
+    "topicDescription": "The topic or subject of your presentation",
+    "topicCannotBeEmpty": "Presentation topic cannot be empty",
+    "presentation": "PowerPoint Presentation",
+    "uploadPresentation": "Upload PowerPoint",
+    "replacePresentationFile": "Replace PowerPoint",
+    "presentationUploaded": "PowerPoint Uploaded",
+    "presentationRequired": "PowerPoint Required",
+    "uploadCheckmark": "Upload Complete",
+    "presentationNote": "Note: Once uploaded, presentations cannot be downloaded by students. Only admins can download presentations. If you need to make changes, please upload a new file.",
+    "replaceNote": "Note: Uploading a new file will replace your current presentation. This action cannot be undone.",
+    "saved": "Saved",
+    "uploadedPresentation": "Uploaded Presentation",
+    "uploadingPresentation": "Uploading presentation...",
+    "uploadError": "Failed to upload presentation",
+    "uploadSuccess": "PowerPoint successfully uploaded!",
+    "fileTooBig": "File is too large. Maximum size is 10MB",
+    "invalidFileType": "Invalid file type. Only PowerPoint files (.ppt, .pptx) are allowed",
+    "currentFile": "Current file",
+    "currentFileDateFormat": "",
+    "downloadPresentation": "Download Presentation",
+    "noPresentation": "No presentation uploaded yet",
+    "fileDownloadNotAllowed": "Downloads disabled for students. Contact admin if needed."
+  },
+  "admin": {
+    "presentationGroups": {
+      "currentSemester": "You are currently in semester {semester}",
+      "semesterFilter": "Groups are filtered to only show those for your selected semester. Create new groups in this semester to make them available to matching students.",
+      "semesterHelp": "Select the semester this presentation section should be available for. Students will only see sections matching their selected semester."
+    }
+  },
+  "username": {
+    "title": "Username",
+    "setUsername": "Set Your Username",
+    "usernameLabel": "Username",
+    "placeholder": "your_username",
+    "oneTimeWarning": "Important: You can only set your username once. After setting, it cannot be changed.",
+    "important": "Your username will be visible to other users and will be used across the platform.",
+    "save": "Save Username",
+    "saving": "Saving...",
+    "current": "Current Username",
+    "locked": "Locked",
+    "cannotChange": "Your username has been set and cannot be changed. This helps maintain consistency across the platform.",
+    "errors": {
+      "empty": "Username cannot be empty",
+      "tooShort": "Username must be at least 3 characters long",
+      "invalidChars": "Username can only contain letters, numbers, and underscores",
+      "taken": "This username is already taken or there was an error.",
+      "failed": "Failed to update username. Please try again."
+    },
+    "success": "Username updated successfully!"
+  },
+  "maintenance": {
+    "title": "Under Construction",
+    "subtitle": "This section is under construction",
+    "message": "We're currently working on improving this section. Please check back later.",
+    "returnButton": "Return to Dashboard"
+  },
+  "supportUs": {
+    "title": "EASY EPU Perks",
+    "subtitle": "Unlock special benefits and help support the platform",
+    "description": "Choose a tier to get exclusive badges and special features while helping us maintain and improve the platform for all students.",
+    "privacyTitle": "Your Privacy Is Our Priority",
+    "privacyDescription": "All payment information is handled securely through Paddle, a trusted payment processor. We never see or store your payment details.",
+    "supportButton": "Get Perks",
+    "confirmTitle": "Confirm Selection",
+    "redirectNotice": "When you click Continue, you'll be redirected to our secure payment processor.",
+    "securePayment": "Your payment information is securely processed by Paddle.",
+    "supportOptions": {
+      "small": {
+        "title": "Basic Tier",
+        "amount": "$5",
+        "description": "Get exclusive Bronze badge next to your name"
+      },
+      "medium": {
+        "title": "Standard Tier",
+        "amount": "$10",
+        "description": "Unlock Gold badge and priority access"
+      },
+      "large": {
+        "title": "Premium Tier",
+        "amount": "$20",
+        "description": "Get Diamond badge and all premium features"
+      }
+    },
+    "thankYou": {
+      "title": "Thank You for Your Support!",
+      "message": "Your badge and perks will be activated shortly.",
+      "returnButton": "Return to Dashboard"
+    }
+  }
+} 
