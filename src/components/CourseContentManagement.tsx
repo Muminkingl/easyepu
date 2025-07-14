@@ -503,4 +503,4 @@ export const CourseContentManagement: React.FC<CourseContentManagementProps> = (
   );
 };
 
-export default CourseContentManagement;
+export default CourseContentManagement; //test
